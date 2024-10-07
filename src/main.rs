@@ -1,27 +1,17 @@
 mod utility;
 use clap::Parser;
-// use std::env;
 use std::io;
 
 //global variables
 const DIRECTORY_PATH: &str = ".rit";
 
-/// test functions 
-fn test1() {
-    println!("Hello from Test1");
-}
-
-fn test2() {
-    println!("Hello from Test2");
-}
-
-
+// remove .rit folder and its contents
 fn rit_remove() -> io::Result<()> {
-
- utility::repo_remove(DIRECTORY_PATH)?;
- Ok(())
+    utility::repo_remove(DIRECTORY_PATH)?;
+    Ok(())
 }
 
+// initialize .rit folder
 fn rit_init() -> io::Result<()> {
     utility::init_file_structure()?;
     Ok(())
@@ -34,16 +24,20 @@ struct Cli {
     input: String,
 }
 
+
+// **Usages**
+// cargo run init                -- runs the init command
+// cargo run "repo remove"       -- runs the repo remove command
+
 fn main() -> io::Result<()> {
+
     // Parsing command line arguments
     let cli = Cli::parse();
     
-    // Call function
+    // calls commands
     match cli.input.as_str() {
-        "test" => test1(),
-        "test2" => test2(),
         "init" => rit_init()?,
-        "repo remove" => rit_remove()?,
+        "repo remove" => rit_remove()?, 
         _ => println!("Unknown command: {}", cli.input),
     }
     Ok(())
