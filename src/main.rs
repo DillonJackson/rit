@@ -1,3 +1,4 @@
+mod utility;
 use clap::Parser;
 // use std::env;
 use std::io;
@@ -9,6 +10,12 @@ fn test1() {
 
 fn test2() {
     println!("Hello from Test2");
+}
+
+
+fn rit_init() -> io::Result<()> {
+ utility::init_file_structure()?;
+ Ok(())
 }
 
 /// A simple CLI application.
@@ -26,6 +33,7 @@ fn main() -> io::Result<()> {
     match cli.input.as_str() {
         "test" => test1(),
         "test2" => test2(),
+        "init" => rit_init()?,
         _ => println!("Unknown command: {}", cli.input),
     }
     Ok(())
