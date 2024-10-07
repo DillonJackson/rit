@@ -3,6 +3,9 @@ use clap::Parser;
 // use std::env;
 use std::io;
 
+//global variables
+const DIRECTORY_PATH: &str = ".rit";
+
 /// test functions 
 fn test1() {
     println!("Hello from Test1");
@@ -13,9 +16,15 @@ fn test2() {
 }
 
 
-fn rit_init() -> io::Result<()> {
- utility::init_file_structure()?;
+fn rit_remove() -> io::Result<()> {
+
+ utility::repo_remove(DIRECTORY_PATH)?;
  Ok(())
+}
+
+fn rit_init() -> io::Result<()> {
+    utility::init_file_structure()?;
+    Ok(())
 }
 
 /// A simple CLI application.
@@ -34,6 +43,7 @@ fn main() -> io::Result<()> {
         "test" => test1(),
         "test2" => test2(),
         "init" => rit_init()?,
+        "repo remove" => rit_remove()?,
         _ => println!("Unknown command: {}", cli.input),
     }
     Ok(())

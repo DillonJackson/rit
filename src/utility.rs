@@ -2,6 +2,11 @@
 use std::fs;
 use std::io;
 
+pub fn repo_remove(path: &str) -> std::io::Result<()> {
+    fs::remove_dir_all(path)?;
+    Ok(())
+}
+
 pub fn init_file_structure()-> io::Result<()> {
     //directories and file names
     const PARENT_DIRECTORY: &str = ".rit";
@@ -10,6 +15,7 @@ pub fn init_file_structure()-> io::Result<()> {
 
     //create parent DIR
     fs::create_dir_all(PARENT_DIRECTORY)?;
+    
 
     //create sub DIR
     for dir in SUB_DIRECTORIES.iter() {
