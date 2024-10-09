@@ -28,3 +28,27 @@ Unwraps on Success: If the Result is Ok, it extracts the value inside and contin
     3. And any others
     4. Test for speed and size on a range of file types.
   
+
+## 10/8/24
+Worked on the benchmarks for the compression algorithms.
+
+### Algorithms tested
+- brotli = "7.0.0"
+- flate2 = "1.0.34"
+- lz4 = "1.28.0"
+- zstd = "0.13.2"
+
+### Results:
+Overall Zstd beat all the other libs out of the water, with a 40% compression at 4.5ms and decompresion at 6.5ms.
+
+#### Zstd
+![zstd_benchmark](./content/zstd_benchmark.png)
+
+#### Flate2
+![flate2_benchmark](./content/zlib_benchmark.png)
+
+#### Brotli
+![brotli_benchmark](./content/brotli_benchmark.png)
+
+#### Lz4
+![lz4_benchmark](./content/lz4_benchmark.png)
