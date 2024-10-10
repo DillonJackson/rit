@@ -2,11 +2,15 @@
 use std::fs;
 use std::io;
 
+
+//removes .rit folder
 pub fn repo_remove(path: &str) -> std::io::Result<()> {
     fs::remove_dir_all(path)?;
     Ok(())
 }
 
+
+//initialize .rit 
 pub fn init_file_structure()-> io::Result<()> {
     //directories and file names
     const PARENT_DIRECTORY: &str = ".rit";
@@ -30,4 +34,16 @@ pub fn init_file_structure()-> io::Result<()> {
     }
 
     Ok(())
+}
+
+
+//creates a file
+pub fn create_file(file_path: &str, filename: &str){
+    let _ = fs::File::create(format!("{}/{}", file_path, filename));
+}
+
+//create a directory
+pub fn create_directory(file_path: &str, filename: &str){
+    let result = format!("{}/{}", file_path, filename);
+    let _ = fs::create_dir_all(result);
 }
