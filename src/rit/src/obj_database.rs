@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{self, Read};
 use sha2::{Sha256, Digest};
+use crate::utility::{create_directory,create_file};
 
 // hash the file, then returns the key of the file
 fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
@@ -34,9 +35,26 @@ pub fn store_data(file_path: &str) -> io::Result<()>{
     
     // Print the stored hash value
     println!("SHA-256 hash: {}", key);
-    
 
-    //
+    //directory filename
+    let sub_dir_name: String = key.chars().take(2).collect();
+    // println!("SHA-256 hash first 2 char: {}", sub_dir_name);
 
+    //file filename
+    let filename: String = key.chars().skip(2).collect();
+    // println!("SHA-256 hash first 2 char: {}", filename);
+
+
+    //create directory for the objects
+    create_directory(".rit/objects", &sub_dir_name);
+
+    //creates the file
+    let result: String = format!("{}/{}", ".rit/objects", sub_dir_name);
+    let result_str: &str = &result;
+    // println!("dir {}", result_str);
+    let _ = create_file(&result_str, &filename, Some(&buffer));
     Ok(())
 }
+
+//    let new_str: &str = format!("{}/{}", "./rit", sub_dir_name);
+//    create_file(&new_str, &filename);
