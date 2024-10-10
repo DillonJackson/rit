@@ -1,6 +1,6 @@
 // helper functions
-use std::fs;
-use std::io;
+use std::fs::{self, OpenOptions};
+use std::io::{self, Write};
 
 
 //removes .rit folder
@@ -36,11 +36,27 @@ pub fn init_file_structure()-> io::Result<()> {
     Ok(())
 }
 
-
 //creates a file
-pub fn create_file(file_path: &str, filename: &str){
-    let _ = fs::File::create(format!("{}/{}", file_path, filename));
+pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> io::Result<()> {
+    let full_path = format!("{}/{}", file_path, filename);
+
+    // Create the file (this will create an empty file)
+    let _ = fs::File::create(&full_path)?;
+
+    if let Some(data) = data {
+        // Open the file for writing
+        let mut file = OpenOptions::new()
+            .write(true)
+            .open(&full_path)?;
+
+        // Write the data to the file
+        file.write_all(data)?;
+        println!("Data written to {}", full_path);
+    }
+    
+    Ok(())
 }
+
 
 //create a directory
 pub fn create_directory(file_path: &str, filename: &str){
