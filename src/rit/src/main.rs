@@ -1,4 +1,5 @@
 mod utility;
+mod obj_database;
 use clap::Parser;
 use std::io;
 
@@ -37,7 +38,11 @@ fn main() -> io::Result<()> {
     // calls commands
     match cli.input.as_str() {
         "init" => rit_init()?,
-        "repo remove" => rit_remove()?, 
+        "repo remove" => rit_remove()?,
+        "hash" =>  match obj_database::store_data("utility.rs") {
+            Ok(key) => println!("Key: {}", key),
+            Err(e) => println!("Error: {}", e),
+        }
         _ => println!("Unknown command: {}", cli.input),
     }
     Ok(())
