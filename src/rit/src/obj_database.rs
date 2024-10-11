@@ -16,7 +16,7 @@ fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
     Ok(format!("{:x}", result))
 }
 
-pub fn store_data(file_path: &str) -> io::Result<()>{
+pub fn store_data(file_path: &str) -> io::Result<String> {
     // Open the file in read-only mode
     let mut file = File::open(file_path)?;
 
@@ -53,7 +53,7 @@ pub fn store_data(file_path: &str) -> io::Result<()>{
     let result_str: &str = &result;
     // println!("dir {}", result_str);
     let _ = create_file(&result_str, &filename, Some(&buffer));
-    Ok(())
+    Ok(key)
 }
 
 //    let new_str: &str = format!("{}/{}", "./rit", sub_dir_name);
