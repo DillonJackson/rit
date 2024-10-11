@@ -1,7 +1,8 @@
 // helper functions
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write, Cursor};
-use zstd::stream::{encode_all as zstd_compress, decode_all as zstd_decompress};
+use zstd::stream::{encode_all as zstd_compress};
+// use zstd::stream::{encode_all as zstd_compress, decode_all as zstd_decompress};
 
 
 //removes .rit folder
@@ -51,7 +52,7 @@ pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> i
             .open(&full_path)?;
 
         // Write the data to the file
-        let mut compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
+        let compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
         file.write_all(&compressed_data)?;
         println!("Data written to {}", full_path);
     }
