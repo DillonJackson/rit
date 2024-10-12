@@ -18,7 +18,13 @@ fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
 
 pub fn store_data(file_path: &str) -> io::Result<String> {
     // Open the file in read-only mode
-    let mut file = File::open(file_path)?;
+    let mut file = match File::open(file_path) {
+        Ok(f) => f, // File created successfully
+        Err(e) => {
+            eprintln!("Error creating file: {}", e); // Log the error
+            return Err(e); 
+        }
+    };
 
     //read the file to buffer
     let mut buffer = Vec::new();
@@ -46,15 +52,12 @@ pub fn store_data(file_path: &str) -> io::Result<String> {
 
 
     //create directory for the objects
-    create_directory(".rit/objects", &sub_dir_name);
+    create_directory(".rit/objects", &sub_dir_name)?;
 
     //creates the file
     let result: String = format!("{}/{}", ".rit/objects", sub_dir_name);
     let result_str: &str = &result;
     // println!("dir {}", result_str);
-    let _ = create_file(&result_str, &filename, Some(&buffer));
+    create_file(&result_str, &filename, Some(&buffer))?;
     Ok(key)
 }
-
-//    let new_str: &str = format!("{}/{}", "./rit", sub_dir_name);
-//    create_file(&new_str, &filename);

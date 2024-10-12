@@ -6,9 +6,17 @@ use zstd::stream::{encode_all as zstd_compress};
 
 
 //removes .rit folder
-pub fn repo_remove(path: &str) -> std::io::Result<()> {
-    fs::remove_dir_all(path)?;
-    Ok(())
+pub fn repo_remove(path: &str) -> io::Result<()> {
+    match fs::remove_dir_all(path) {
+        Ok(_) => {
+            //println!("Successfully removed repo: {}", path);
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Error removing repo '{}': {}", path, e);
+            return Err(e);
+        }
+    }
 }
 
 
@@ -21,7 +29,6 @@ pub fn init_file_structure()-> io::Result<()> {
 
     //create parent DIR
     fs::create_dir_all(PARENT_DIRECTORY)?;
-    
 
     //create sub DIR
     for dir in SUB_DIRECTORIES.iter() {
@@ -39,11 +46,12 @@ pub fn init_file_structure()-> io::Result<()> {
 }
 
 //creates a file
+// pass in "None" to data when not writing to file
 pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> io::Result<()> {
     let full_path = format!("{}/{}", file_path, filename);
 
     // Create the file (this will create an empty file)
-    let _ = fs::File::create(&full_path)?;
+    fs::File::create(&full_path)?;
 
     if let Some(data) = data {
         // Open the file for writing
@@ -54,15 +62,16 @@ pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> i
         // Write the data to the file
         let compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
         file.write_all(&compressed_data)?;
-        println!("Data written to {}", full_path);
+        //println!("Data written to {}", full_path);
     }
-    
+
     Ok(())
 }
 
 
 //create a directory
-pub fn create_directory(file_path: &str, filename: &str){
-    let result = format!("{}/{}", file_path, filename);
-    let _ = fs::create_dir_all(result);
+pub fn create_directory(file_path: &str, dir_name: &str) -> io::Result<()>{
+    let result = format!("{}/{}", file_path, dir_name);
+    fs::create_dir_all(&result)?;
+    Ok(())
 }
