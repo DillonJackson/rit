@@ -1,16 +1,22 @@
 mod utility;
 mod obj_database;
 mod args;
+mod constants;
+mod index;
 
 
 use args::{RitArgs, Commands};
 use std::io;
 use std::path::Path;
 use clap::Parser;
+use constants::DIRECTORY_PATH;
 
+// 100644 for normal files.
+// 100755 for executable files.
+// 120000 for symbolic links.
 
 //global variables
-const DIRECTORY_PATH: &str = ".rit";
+
 
 // remove .rit folder and its contents
 fn rit_remove() -> io::Result<()> {
