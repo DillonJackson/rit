@@ -1,9 +1,24 @@
 // helper functions
+use std::fs::File;
 use std::fs::{self, OpenOptions};
-use std::io::{self, Write, Cursor};
-use zstd::stream::{encode_all as zstd_compress};
-// use zstd::stream::{encode_all as zstd_compress, decode_all as zstd_decompress};
+use std::io::{self, Write, Cursor, Read};
+use zstd::stream::{encode_all as zstd_compress, decode_all as zstd_decompress};
 
+pub fn open_file(file_path: &str) -> io::Result<Vec<u8>> {
+    // Open the file in read-only mode
+    let mut file = match File::open(file_path) {
+        Ok(f) => f, // File created successfully
+        Err(e) => {
+            eprintln!("Error opening file: {}", e); // Log the error
+            return Err(e);
+        }
+    };
+
+    // Read the file into the buffer
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
 
 //removes .rit folder
 pub fn repo_remove(path: &str) -> io::Result<()> {

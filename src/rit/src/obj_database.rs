@@ -1,7 +1,6 @@
-use std::fs::File;
-use std::io::{self, Read};
 use sha2::{Sha256, Digest};
-use crate::utility::{create_directory,create_file};
+use std::io;
+use crate::utility::{create_directory,create_file, open_file};
 
 // hash the file, then returns the key of the file
 fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
@@ -18,18 +17,7 @@ fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
 
 pub fn store_data(file_path: &str) -> io::Result<String> {
     // Open the file in read-only mode
-    let mut file = match File::open(file_path) {
-        Ok(f) => f, // File created successfully
-        Err(e) => {
-            eprintln!("Error creating file: {}", e); // Log the error
-            return Err(e); 
-        }
-    };
-
-    //read the file to buffer
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-
+    let buffer = open_file(&file_path)?;
     //hash the file to obtain the key
     let key = match hash_file(&buffer) {
         Ok(hash_value) => hash_value,
