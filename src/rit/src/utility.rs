@@ -60,6 +60,16 @@ pub fn init_file_structure()-> io::Result<()> {
     Ok(())
 }
 
+pub fn compress_data(data: &Vec<u8>) -> io::Result<Vec<u8>> {
+    let compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
+    Ok(compressed_data)
+}
+
+pub fn uncompress_data(data: &Vec<u8>) -> io::Result<Vec<u8>> {
+    let compressed_data = zstd_decompress(Cursor::new(data)).expect("Failed to decompress with zstd");
+    Ok(compressed_data)
+}
+
 //creates a file
 // pass in "None" to data when not writing to file
 pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> io::Result<()> {
@@ -75,7 +85,8 @@ pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> i
             .open(&full_path)?;
 
         // Write the data to the file
-        let compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
+        // let compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
+        let compressed_data = compress_data(data)?;
         file.write_all(&compressed_data)?;
         //println!("Data written to {}", full_path);
     }

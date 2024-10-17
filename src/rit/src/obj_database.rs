@@ -1,6 +1,6 @@
 use sha2::{Sha256, Digest};
 use std::io;
-use crate::utility::{create_directory,create_file, open_file};
+use crate::utility::{create_directory,create_file, open_file, uncompress_data};
 
 // hash the file, then returns the key of the file
 fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
@@ -48,4 +48,22 @@ pub fn store_data(file_path: &str) -> io::Result<String> {
     // println!("dir {}", result_str);
     create_file(&result_str, &filename, Some(&buffer))?;
     Ok(key)
+}
+
+pub fn get_data(key: &str) -> io::Result<Vec<u8>> {
+    let sub_dir_name: String = key.chars().take(2).collect();
+    let filename: String = key.chars().skip(2).collect();
+    let file_path: String = format!(".rit/objects/{}/{}", sub_dir_name, filename);
+    let buffer = open_file(&file_path)?;
+    match uncompress_data(&buffer) {
+        Ok(data) => {
+            if let Ok(string_data) = String::from_utf8(data.clone()) {
+                println!("Decompressed data: {}", string_data);
+            } else {
+                println!("Decompressed data (binary): {:?}", data);
+            }
+            Ok(data)
+        },
+        Err(e) => Err(e),
+    }
 }

@@ -17,7 +17,9 @@ pub enum Commands {
     Remove,
 
     /// Store the file in the object database and return the key
-    HashObject(HashObjectCommand)
+    HashObject(HashObjectCommand),
+
+    blob(HashObjectCommand)
 }
 
 #[derive(Debug, Args)]
@@ -25,3 +27,4 @@ pub struct HashObjectCommand {
     /// The file to store
     pub file: String
 }
+

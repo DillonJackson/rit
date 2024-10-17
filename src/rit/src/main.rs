@@ -62,6 +62,10 @@ fn main() -> io::Result<()> {
             check_repo_initialized()?;
             obj_database::store_data(&hash_args.file)?;
         }
+        Commands::blob(hash_args) => {
+            check_repo_initialized()?;
+            obj_database::get_data(&hash_args.file)?;
+        }
     }
 
     Ok(())
