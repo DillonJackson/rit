@@ -64,18 +64,16 @@ fn main() -> io::Result<()> {
         }
         Commands::blob(hash_args) => {
             check_repo_initialized()?;
-            obj_database::get_data(&hash_args.file)?;
-        }
-        Commands::blob(hash_args) => {
-            check_repo_initialized()?;
-            let path: &Path = Path::new(&hash_args.file);
-            let key = match obj_database::tree_init(path) {
-                Ok(hash_value) => hash_value,
-                Err(e) => {
-                    eprintln!("Error {}", e);
-                    return Err(e.into());
-                }
-            };
+            // let path: &Path = Path::new(&hash_args.file);
+            // let key = match obj_database::tree_init(path) {
+            //     Ok(hash_value) => hash_value,
+            //     Err(e) => {
+            //         eprintln!("Error {}", e);
+            //         return Err(e.into());
+            //     }
+            // };
+
+            let key = obj_database::get_tree(&hash_args.file)?;
         }
     }
 

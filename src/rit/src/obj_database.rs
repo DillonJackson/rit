@@ -1,7 +1,7 @@
 use sha2::{Sha256, Digest};
-use std::io;
+use std::io::{self, BufReader, Cursor, BufRead};
 use crate::utility::{create_directory,create_file, open_file, uncompress_data};
-use json::{JsonValue};
+use json::{JsonValue,parse};
 use std::path::Path;
 use std::fs;
 
@@ -59,18 +59,21 @@ pub fn tree_init(dir: &Path)-> io::Result<String> {
                 }
             };
 
-
+            // Creates a json obj
             let json_obj = create_json_obj("blob", &file_hash, &file_name);
 
             let json_string = json_obj.dump();
 
-            // Convert the String to a Vec<u8>
+            // Must conver the String to a Vec<u8> 
             let json_bytes: Vec<u8> = json_string.into_bytes();
+
+            // Stores data as a 1D vector
             files.extend(json_bytes);
             files.push(b'\n'); // Add a newline after each entr
         }
     }
     
+    //hashing the vector
     let key = match store_buffer(&files) {
         Ok(hash_value) => hash_value,
         Err(e) => {
@@ -78,17 +81,10 @@ pub fn tree_init(dir: &Path)-> io::Result<String> {
             return Err(e);
         },
     };
-    println!(" tree SHA-256 hash: {}", key);
+
+    // println!(" tree SHA-256 hash: {}", key);
     Ok(key)
 }
-
-    // // Accessing values
-    // for file in &files {
-    //     let file_type = &file["type"];
-    //     let hash_value = &file["hashvalue"];
-    //     let filename = &file["filename"];
-    //     println!("Type: {}, Hash: {}, Filename: {}", file_type, hash_value, filename);
-    // }
 
 // hash the file, then returns the key of the file
 fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
@@ -103,7 +99,9 @@ fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
     Ok(format!("{:x}", result))
 }
 
-pub fn store_data(file_path: &str) -> io::Result<String> {
+
+//storing a file
+pub fn store_file(file_path: &str) -> io::Result<String> {
     // Open the file in read-only mode
     let buffer = open_file(&file_path)?;
     //hash the file to obtain the key
@@ -117,6 +115,7 @@ pub fn store_data(file_path: &str) -> io::Result<String> {
     Ok(key)
 }
 
+//storing a Vec<u8>
 fn store_buffer(buffer: &Vec<u8>) -> io::Result<String>{
 
     let key = match hash_file(&buffer) {
@@ -150,6 +149,48 @@ fn store_buffer(buffer: &Vec<u8>) -> io::Result<String>{
     Ok(key)
 }
 
+//return the content of a tree
+pub fn get_tree(key: &str) -> io::Result<()>{
+    let sub_dir_name: String = key.chars().take(2).collect();
+    let filename: String = key.chars().skip(2).collect();
+    let file_path: String = format!(".rit/objects/{}/{}", sub_dir_name, filename);
+    let buffer = open_file(&file_path)?;
+
+    let data = uncompress_data(&buffer)?;
+    
+    let cursor = Cursor::new(data);
+    let reader = BufReader::new(cursor);
+
+    for line in reader.lines() {
+        match line {
+            Ok(valid_line) => {
+                // Parse the line 
+                match parse(&valid_line) {
+                    Ok(json_obj) => {
+                        // Print out the tree data
+                        if let (Some(file_type), Some(hashvalue), Some(filename)) = (
+                            json_obj["type"].as_str(),
+                            json_obj["hashvalue"].as_str(),
+                            json_obj["filename"].as_str(),
+                        ) {
+                            println!("{} {} {}", file_type, hashvalue, filename);
+                        } else {
+                            println!("Could not retrieve one or more fields.");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to parse JSON: {}", e);
+                    }
+                }
+            }
+            Err(e) => eprintln!("Error reading line: {}", e),
+        }
+    }
+    Ok(())
+}
+
+
+//return the content of a blob
 pub fn get_data(key: &str) -> io::Result<Vec<u8>> {
     let sub_dir_name: String = key.chars().take(2).collect();
     let filename: String = key.chars().skip(2).collect();
