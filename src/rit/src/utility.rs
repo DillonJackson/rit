@@ -77,7 +77,7 @@ pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> i
 
     // Create the file (this will create an empty file)
     fs::File::create(&full_path)?;
-
+    println!("full path {}", full_path);
     if let Some(data) = data {
         // Open the file for writing
         let mut file = OpenOptions::new()
