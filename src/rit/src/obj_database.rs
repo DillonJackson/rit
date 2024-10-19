@@ -6,6 +6,23 @@ use std::path::Path;
 use std::fs;
 
 
+//test folder
+const DIRECTORY_PATH: &str = ".rit/files";
+
+// create tree
+pub fn create_tree()-> io::Result<()>{
+    let path: &Path = Path::new(&DIRECTORY_PATH);
+    let key = match tree_init(path) {
+        Ok(hash_value) => hash_value,
+        Err(e) => {
+            eprintln!("Error {}", e);
+            return Err(e.into());
+        }
+    };
+    println!(" root tree SHA-256 hash: {}", key);
+    Ok(())
+}
+
 // Function to create a new file object
 fn create_json_obj(file_type: &str, hash_value: &str, filename: &str) -> JsonValue {
     let mut file = JsonValue::new_object();
@@ -15,7 +32,7 @@ fn create_json_obj(file_type: &str, hash_value: &str, filename: &str) -> JsonVal
     file
 }
 
-pub fn tree_init(dir: &Path)-> io::Result<String> {
+fn tree_init(dir: &Path)-> io::Result<String> {
     // Create a vector to hold multiple file objects
     let mut files = Vec::new();
 
@@ -48,7 +65,7 @@ pub fn tree_init(dir: &Path)-> io::Result<String> {
             files.push(b'\n'); // Add a newline after each entr
         } else if path.is_file() {
 
-            let file_hash = store_data(&path.display().to_string())?;
+            let file_hash = store_file(&path.display().to_string())?;
     
             // Get the file name
             let file_name = {
