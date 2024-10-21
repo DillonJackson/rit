@@ -125,9 +125,9 @@ fn read_index_entry<R: Read>(reader: &mut R) -> io::Result<IndexEntry> {
     let mode = u32::from_be_bytes(mode_bytes);
 
     // Read the hash length
-    let mut hash_len_bytes = [0u8; 2];
+    let mut hash_len_bytes = [0u8; 1];
     reader.read_exact(&mut hash_len_bytes)?;
-    let hash_len = u16::from_be_bytes(hash_len_bytes) as usize;
+    let hash_len = u8::from_be_bytes(hash_len_bytes) as usize;
 
     // Read the hash
     let mut hash_bytes = vec![0u8; hash_len];
@@ -156,7 +156,7 @@ fn write_index_entry<W: Write>(writer: &mut W, entry: &IndexEntry) -> io::Result
     writer.write_all(&entry.mode.to_be_bytes())?;
 
     let hash_bytes = entry.blob_hash.as_bytes();
-    let hash_len = hash_bytes.len() as u16;
+    let hash_len = hash_bytes.len() as u8;
     writer.write_all(&hash_len.to_be_bytes())?;
     writer.write_all(hash_bytes)?;
 
@@ -296,7 +296,7 @@ mod tests {
 
         let expected_bytes: Vec<u8> = vec![
             0x00, 0x00, 0x81, 0xA4,  // Mode: 0o100644 -> u32 -> [0x00, 0x00, 0x81, 0xA4]
-            0x00, 0x06,              // Hash length: 6 (length of "123abc")
+            0x06,              // Hash length: 6 (length of "123abc")
             0x31, 0x32, 0x33, 0x61, 0x62, 0x63, // Hash: "123abc"
             0x00, 0x0d,              // Path length: 13 (length of "test_file.txt")
             0x74, 0x65, 0x73, 0x74, 0x5f, 0x66, 0x69, 0x6c, 0x65, 0x2e, 0x74, 0x78, 0x74 // Path: "test_file.txt"
@@ -311,7 +311,7 @@ mod tests {
         // Prepare the bytes as they would appear in the index file
         let entry_bytes: Vec<u8> = vec![
             0x00, 0x00, 0x81, 0xA4,        // Mode: 0o100644 -> u32 -> [0x00, 0x00, 0x81, 0xA4]
-            0x00, 0x06,                    // Hash length: 6
+            0x06,                    // Hash length: 6
             0x31, 0x32, 0x33, 0x61, 0x62, 0x63, // Hash: "123abc"
             0x00, 0x0d,                    // Path length: 13 (length of "test_file.txt")
             0x74, 0x65, 0x73, 0x74, 0x5f, 0x66, 0x69, 0x6c, 0x65, 0x2e, 0x74, 0x78, 0x74 // Path: "test_file.txt"
@@ -366,7 +366,7 @@ mod tests {
         let mut file = File::create(&index_path).unwrap();
         let entry_bytes: Vec<u8> = vec![
             0x00, 0x00, 0x81, 0xA4,        // Mode: 0o100644 -> u32 -> [0x00, 0x00, 0x81, 0xA4]
-            0x00, 0x06,                    // Hash length: 6
+            0x06,                    // Hash length: 6
             0x31, 0x32, 0x33, 0x61, 0x62, 0x63, // Hash: "123abc"
             0x00, 0x0d,                    // Path length: 13 (length of "test_file.txt")
             0x74, 0x65, 0x73, 0x74, 0x5f, 0x66, 0x69, 0x6c, 0x65, 0x2e, 0x74, 0x78, 0x74 // Path: "test_file.txt"
@@ -402,7 +402,7 @@ mod tests {
         // Create an initial entry in the index file
         let initial_entry_bytes: Vec<u8> = vec![
             0x00, 0x00, 0x81, 0xA4,        // Mode: 0o100644 -> u32 -> [0x00, 0x00, 0x81, 0xA4]
-            0x00, 0x06,                    // Hash length: 6
+            0x06,                    // Hash length: 6
             0x31, 0x32, 0x33, 0x61, 0x62, 0x63, // Hash: "123abc"
             0x00, 0x0d,                    // Path length: 13 (length of "test_file.txt")
             0x74, 0x65, 0x73, 0x74, 0x5f, 0x66, 0x69, 0x6c, 0x65, 0x2e, 0x74, 0x78, 0x74 // Path: "test_file.txt"
