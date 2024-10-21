@@ -1,9 +1,9 @@
 // helper functions
 use std::fs::File;
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write, Cursor, Read};
+use std::fs::{self};
+use std::io::{self, Read};
 use std::path::PathBuf;
-use zstd::stream::{encode_all as zstd_compress, decode_all as zstd_decompress};
+// use zstd::stream::{encode_all as zstd_compress, decode_all as zstd_decompress};
 
 pub fn open_file(file_path: &PathBuf) -> io::Result<Vec<u8>> {
     // Open the file in read-only mode

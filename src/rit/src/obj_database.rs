@@ -1,5 +1,5 @@
 use crate::constants::{DIRECTORY_PATH, OBJECTS_DIR};
-use crate::utility::{create_directory, create_file, open_file};
+// use crate::utility::{create_directory, open_file};
 use crate::compression::{compress_data, uncompress_data};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -31,7 +31,7 @@ pub fn store_data(data: &[u8]) -> io::Result<String> {
 
     // Write the data to the file in the object database
     let mut file = File::create(object_path)?; // Create the file
-    file.write_all(data)?; // Write the data to the file
+    file.write_all(&data)?; // Write the data to the file
     file.flush()?; // Ensure all data is written to disk
 
     // Return the key

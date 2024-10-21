@@ -5,6 +5,8 @@ mod constants;
 mod index;
 mod staging;
 mod repo;
+mod compression;
+
 
 use repo::{rit_init, rit_remove, check_repo_initialized};
 use args::{RitArgs, Commands};
@@ -37,7 +39,8 @@ fn main() -> io::Result<()> {
         },
         Commands::HashObject(hash_args) => {
             check_repo_initialized()?;
-            obj_database::store_file(&hash_args.file)?;
+            let key = obj_database::store_file(&hash_args.file)?;
+            println!("{}", key);
         }
         Commands::Blob(hash_args) => {
             check_repo_initialized()?;
