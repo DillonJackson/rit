@@ -3,46 +3,17 @@ mod obj_database;
 mod args;
 mod constants;
 mod index;
+mod staging;
+mod repo;
 
-
+use repo::{rit_init, rit_remove, check_repo_initialized};
 use args::{RitArgs, Commands};
-use std::io;
-use std::path::Path;
 use clap::Parser;
-use constants::DIRECTORY_PATH;
+use std::io;
 
 // 100644 for normal files.
 // 100755 for executable files.
 // 120000 for symbolic links.
-
-//global variables
-
-
-// remove .rit folder and its contents
-fn rit_remove() -> io::Result<()> {
-    utility::repo_remove(DIRECTORY_PATH)?;
-    Ok(())
-}
-
-// initialize .rit folder
-fn rit_init() -> io::Result<()> {
-    // Check if the repository is already initialized
-    if Path::new(DIRECTORY_PATH).exists() {
-        return Err(io::Error::new(io::ErrorKind::AlreadyExists, "Repository already initialized."));
-    }
-    
-    utility::init_file_structure()?;
-    println!("Repository initialized at {}.", DIRECTORY_PATH);
-    Ok(())
-}
-
-// Helper function to check if the repository is initialized
-fn check_repo_initialized() -> io::Result<()> {
-    if !Path::new(DIRECTORY_PATH).exists() {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "Repository not initialized. Please run `rit init` first."));
-    }
-    Ok(())
-}
 
 // **Usages**
 // cargo run                     -- returns the help message   
@@ -66,11 +37,16 @@ fn main() -> io::Result<()> {
         },
         Commands::HashObject(hash_args) => {
             check_repo_initialized()?;
-            obj_database::store_data(&hash_args.file)?;
+            obj_database::store_file(&hash_args.file)?;
         }
-        Commands::blob(hash_args) => {
+        Commands::Blob(hash_args) => {
             check_repo_initialized()?;
-            obj_database::get_data(&hash_args.file)?;
+            let data = obj_database::get_data(&hash_args.key)?;
+            println!("{}", String::from_utf8_lossy(&data));
+        }
+        Commands::Add(add_args) => {
+            check_repo_initialized()?;
+            staging::add_file_to_staging(&add_args.file)?;
         }
     }
 
