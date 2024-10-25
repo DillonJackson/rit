@@ -63,7 +63,7 @@ fn main() -> io::Result<()> {
             check_repo_initialized()?;
             obj_database::store_file(&hash_args.file)?;
         },
-        Commands::tree(hash_args) => {
+        Commands::LsTree(hash_args) => {
             check_repo_initialized()?;
             let key = obj_database::get_tree(&hash_args.file)?;
         },
