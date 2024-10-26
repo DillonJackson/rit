@@ -207,6 +207,58 @@ pub fn get_tree(key: &str) -> io::Result<()>{
     Ok(())
 }
 
+//return the filename and hash if it exist, otherwise NULL
+pub fn obj_in_tree(root_key: &str, full_path: &str, file_key: &str) -> io::Result<String> {
+    let path = Path::new(full_path);
+
+    let mut parent_key = root_key.to_string();
+    let file_name = path.file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "File name not found"))?;
+
+    for component in path.components() {
+        let sub_dir_name: String = parent_key.chars().take(2).collect();
+        let filename: String = parent_key.chars().skip(2).collect();
+        let parent_file_path = format!(".rit/objects/{}/{}", sub_dir_name, filename);
+        let buffer = open_file(&parent_file_path)?;
+        let data = uncompress_data(&buffer)?;
+
+        let cursor = Cursor::new(data);
+        let reader = BufReader::new(cursor);
+
+        for line in reader.lines() {
+            match line {
+                Ok(valid_line) => {
+                    match parse(&valid_line) {
+                        Ok(json_obj) => {
+                            if let (Some(_obj_file_type), Some(obj_hashvalue), Some(obj_filename)) = (
+                                json_obj["type"].as_str(),
+                                json_obj["hashvalue"].as_str(),
+                                json_obj["filename"].as_str(),
+                            ) {
+                                if obj_filename == file_name {
+                                    return Ok(obj_hashvalue.to_string());
+                                } else if file_key ==  obj_hashvalue {
+                                    return Ok(obj_filename.to_string());
+                                } else if component.as_os_str() == std::ffi::OsStr::new(obj_filename) {
+                                    parent_key = obj_hashvalue.to_string();
+                                } else {
+                                    continue;
+                                }
+                            }
+                        }
+                        Err(_e) => {
+                            return Err(io::Error::new(io::ErrorKind::InvalidData, "Not a tree object"));
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Error reading line: {}", e),
+            }
+        }
+    }
+    Err(io::Error::new(io::ErrorKind::NotFound, "Object not found"))
+}
+
 
 //return the content of a blob
 pub fn get_data(key: &str) -> io::Result<()> {
