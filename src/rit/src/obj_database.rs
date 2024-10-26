@@ -195,8 +195,9 @@ pub fn get_tree(key: &str) -> io::Result<()>{
                             println!("Could not retrieve one or more fields.");
                         }
                     }
-                    Err(e) => {
-                        eprintln!("Failed to parse JSON: {}", e);
+                    Err(_e) => {
+                        eprintln!("fatal: not a tree object");
+                        return Ok(());
                     }
                 }
             }
@@ -208,20 +209,37 @@ pub fn get_tree(key: &str) -> io::Result<()>{
 
 
 //return the content of a blob
-pub fn get_data(key: &str) -> io::Result<Vec<u8>> {
+pub fn get_data(key: &str) -> io::Result<()> {
     let sub_dir_name: String = key.chars().take(2).collect();
     let filename: String = key.chars().skip(2).collect();
-    let file_path: String = format!(".rit/objects/{}/{}", sub_dir_name, filename);
+    let file_path = format!(".rit/objects/{}/{}", sub_dir_name, filename);
     let buffer = open_file(&file_path)?;
-    match uncompress_data(&buffer) {
-        Ok(data) => {
-            if let Ok(string_data) = String::from_utf8(data.clone()) {
-                println!("Decompressed data: {}", string_data);
-            } else {
-                println!("Decompressed data (binary): {:?}", data);
+    
+    let data = uncompress_data(&buffer)?;
+
+    let cursor = Cursor::new(data.clone());
+    let reader = BufReader::new(cursor);
+
+    if let Some(Ok(valid_line)) = reader.lines().next() {
+        match parse(&valid_line) {
+            Ok(json_obj) => {
+                if let (Some(file_type), Some(hashvalue), Some(filename)) = (
+                    json_obj["type"].as_str(),
+                    json_obj["hashvalue"].as_str(),
+                    json_obj["filename"].as_str(),
+                ) {
+                    println!("fatal: rit cat-file {}: bad file", key);
+                    return Ok(());
+                }
             }
-            Ok(data)
-        },
-        Err(e) => Err(e),
+            Err(_) => {
+                if let Ok(string_data) = String::from_utf8(data) {
+                    println!("{}", string_data);
+                }
+            }
+        }
+    } else {
+        eprintln!("Error reading the first line.");
     }
+    Ok(())
 }
