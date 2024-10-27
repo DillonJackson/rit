@@ -8,3 +8,6 @@ clap = { version = "4", features = ["derive"] }
 sha2 = "0.10"  # Check for the latest version
 tokio = { version = "1", features = ["full"] }  # Optional for async
 zstd = "0.10"  
+
+[dev-dependencies]
+tempfile = "3.13.0"

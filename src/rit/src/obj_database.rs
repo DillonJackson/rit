@@ -156,3 +156,87 @@ fn hash_data(buffer: &[u8]) -> io::Result<String> {
     let result = hasher.finalize();
     Ok(format!("{:x}", result))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+    use std::env;
+    use std::path::PathBuf;
+
+    // Helper function to create a temp directory and set it as the current working directory
+    fn setup_test_env() -> PathBuf {
+        // Create a temporary directory for the test
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+        let original_dir = env::current_dir().unwrap();
+
+        // Change the current working directory to the temp directory
+        env::set_current_dir(&temp_dir_path).unwrap();
+
+        // Return the original directory so we can restore it after the test
+        original_dir
+    }
+
+    #[test]
+    fn test_store_and_get_data() {
+        let original_dir = setup_test_env(); // Switch to temp directory
+
+        // Perform the test
+        let data = b"example data";
+        let key = store_data(data).unwrap();
+
+        // Check if the data was stored and can be retrieved correctly
+        let retrieved_data = get_data(&key).unwrap();
+        assert_eq!(retrieved_data, data);
+
+        // Restore the original directory
+        env::set_current_dir(&original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_store_and_delete_data() {
+        let original_dir = setup_test_env();
+
+        let data = b"example data";
+        let key = store_data(data).unwrap();
+
+        let retrieved_data = get_data(&key).unwrap();
+        assert_eq!(retrieved_data, data);
+
+        delete_data(&key).unwrap();
+        assert!(get_data(&key).is_err());
+
+        env::set_current_dir(&original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_store_file() {
+        let original_dir = setup_test_env();
+
+        // Create a temporary file with some content
+        let file_path = PathBuf::from("test_file.txt");
+        let file_data = b"file data";
+        fs::write(&file_path, file_data).unwrap();
+
+        // Store the file in the object database
+        let key = store_file(file_path.to_str().unwrap()).unwrap();
+
+        // Retrieve and verify the stored content
+        let retrieved_data = get_data(&key).unwrap();
+        assert_eq!(retrieved_data, file_data);
+
+        env::set_current_dir(&original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_data_not_found() {
+        let original_dir = setup_test_env();
+
+        let non_existent_key = "nonexistentkey1234567890";
+        assert!(get_data(non_existent_key).is_err());
+
+        env::set_current_dir(&original_dir).unwrap();
+    }
+}
