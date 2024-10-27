@@ -59,6 +59,7 @@ fn main() -> io::Result<()> {
     match args.command {
         Commands::Init => {
             rit_init()?;
+            obj_database::create_tree()?;
         },
         Commands::Remove => {
             check_repo_initialized()?;
@@ -66,11 +67,16 @@ fn main() -> io::Result<()> {
         },
         Commands::HashObject(hash_args) => {
             check_repo_initialized()?;
-            obj_database::store_data(&hash_args.file)?;
-        }
+            obj_database::store_file(&hash_args.file)?;
+        },
+        Commands::LsTree(hash_args) => {
+            check_repo_initialized()?;
+            let key = obj_database::get_tree(&hash_args.file)?;
+        },
         Commands::blob(hash_args) => {
             check_repo_initialized()?;
             obj_database::get_data(&hash_args.file)?;
+            // obj_database::create_tree()?;
         }
     }
 

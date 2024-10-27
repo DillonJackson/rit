@@ -19,7 +19,9 @@ pub enum Commands {
     /// Store the file in the object database and return the key
     HashObject(HashObjectCommand),
 
-    blob(HashObjectCommand)
+    blob(HashObjectCommand),
+
+    LsTree(HashObjectCommand)
 }
 
 #[derive(Debug, Args)]
