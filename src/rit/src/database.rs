@@ -1,7 +1,8 @@
 use crate::constants::{DIRECTORY_PATH, OBJECTS_DIR};
 // use crate::utility::{create_directory, open_file};
 use crate::compression::{compress_data, uncompress_data};
-use sha2::{Digest, Sha256};
+use crate::hash::{hash_data};
+
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -142,19 +143,6 @@ pub fn create_object_database() -> io::Result<()> {
     let result = get_object_database_path();
     fs::create_dir_all(&result)?;
     Ok(())
-}
-
-// hash the file, then returns the key of the file
-fn hash_data(buffer: &[u8]) -> io::Result<String> {
-    // Create a new SHA-256 hasher
-    let mut hasher = Sha256::new();
-
-    // Update the hasher with the file contents
-    hasher.update(buffer);
-
-    // Finalize the hash and convert it to a hexadecimal string
-    let result = hasher.finalize();
-    Ok(format!("{:x}", result))
 }
 
 #[cfg(test)]

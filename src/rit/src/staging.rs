@@ -1,5 +1,5 @@
 use crate::index;
-use crate::obj_database;
+use crate::database;
 use std::io::{Error, ErrorKind};
 
 
@@ -10,7 +10,7 @@ pub fn add_file_to_staging(file_path: &str) -> Result<(), Error> {
     }
     
     // Store the file in the object database
-    let blob_hash = obj_database::store_file(file_path)?;
+    let blob_hash = database::store_file(file_path)?;
     
     // Check if the file is already in the latest commit
 

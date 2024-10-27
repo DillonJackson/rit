@@ -1,11 +1,12 @@
 mod utility;
-mod obj_database;
+mod database;
 mod args;
 mod constants;
 mod index;
 mod staging;
 mod repo;
 mod compression;
+mod hash;
 
 
 use repo::{rit_init, rit_remove, check_repo_initialized};
@@ -39,12 +40,12 @@ fn main() -> io::Result<()> {
         },
         Commands::HashObject(hash_args) => {
             check_repo_initialized()?;
-            let key = obj_database::store_file(&hash_args.file)?;
+            let key = database::store_file(&hash_args.file)?;
             println!("{}", key);
         }
         Commands::Blob(hash_args) => {
             check_repo_initialized()?;
-            let data = obj_database::get_data(&hash_args.key)?;
+            let data = database::get_data(&hash_args.key)?;
             println!("{}", String::from_utf8_lossy(&data));
         }
         Commands::Add(add_args) => {

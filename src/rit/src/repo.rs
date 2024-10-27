@@ -1,7 +1,7 @@
 use crate::index;
 use crate::utility;
 use crate::constants::DIRECTORY_PATH;
-use crate::obj_database;
+use crate::database;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::fs;
@@ -35,7 +35,7 @@ pub fn rit_init() -> Result<()> {
 
     // Create the repository structure
     // utility::init_file_structure()?;
-    obj_database::create_object_database()?;
+    database::create_object_database()?;
     index::create_index()?;
 
     println!("Repository initialized at {}.", DIRECTORY_PATH);
