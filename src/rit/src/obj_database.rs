@@ -1,9 +1,11 @@
 use sha2::{Sha256, Digest};
 use std::io::{self, BufReader, Cursor, BufRead};
-use crate::utility::{create_directory,create_file, open_file, uncompress_data};
+use crate::utility::{create_directory,create_file, open_file};
+use crate::compression::{uncompress_data};
 use json::{JsonValue,parse};
 use std::path::Path;
 use std::fs;
+use std::path::PathBuf;
 
 
 //test folder
@@ -120,7 +122,8 @@ fn hash_file(buffer: &Vec<u8>) -> io::Result<String> {
 //storing a file
 pub fn store_file(file_path: &str) -> io::Result<String> {
     // Open the file in read-only mode
-    let buffer = open_file(&file_path)?;
+    let path = PathBuf::from(file_path);
+    let buffer = open_file(&path)?;
     //hash the file to obtain the key
     let key = match store_buffer(&buffer) {
         Ok(hash_value) => hash_value,
@@ -171,7 +174,8 @@ pub fn get_tree(key: &str) -> io::Result<()>{
     let sub_dir_name: String = key.chars().take(2).collect();
     let filename: String = key.chars().skip(2).collect();
     let file_path: String = format!(".rit/objects/{}/{}", sub_dir_name, filename);
-    let buffer = open_file(&file_path)?;
+    let path = PathBuf::from(&file_path);
+    let buffer = open_file(&path)?;
 
     let data = uncompress_data(&buffer)?;
     
@@ -272,7 +276,8 @@ pub fn obj_in_tree(root_key: &str, full_path: &str, file_key: &str) -> io::Resul
         let sub_dir_name: String = parent_key.chars().take(2).collect();
         let filename: String = parent_key.chars().skip(2).collect();
         let parent_file_path = format!(".rit/objects/{}/{}", sub_dir_name, filename);
-        let buffer = open_file(&parent_file_path)?;
+        let path = PathBuf::from(&parent_file_path);
+        let buffer = open_file(&path)?;
         let data = uncompress_data(&buffer)?;
 
         let cursor = Cursor::new(data);
@@ -317,7 +322,8 @@ pub fn get_data(key: &str) -> io::Result<()> {
     let sub_dir_name: String = key.chars().take(2).collect();
     let filename: String = key.chars().skip(2).collect();
     let file_path = format!(".rit/objects/{}/{}", sub_dir_name, filename);
-    let buffer = open_file(&file_path)?;
+    let path = PathBuf::from(&file_path);
+    let buffer = open_file(&path)?;
     
     let data = uncompress_data(&buffer)?;
 

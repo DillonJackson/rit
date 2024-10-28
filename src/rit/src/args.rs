@@ -21,7 +21,7 @@ pub enum Commands {
 
     Blob(BlobCommand),
 
-    Add(AddCommand)
+    Add(AddCommand),
 
     LsTree(HashObjectCommand)
 }

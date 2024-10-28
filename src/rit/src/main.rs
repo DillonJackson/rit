@@ -1,5 +1,6 @@
 mod utility;
 mod database;
+mod obj_database;
 mod args;
 mod constants;
 mod index;
@@ -57,9 +58,9 @@ fn main() -> io::Result<()> {
             check_repo_initialized()?;
             let key = obj_database::get_tree(&hash_args.file)?;
         },
-        Commands::blob(hash_args) => {
+        Commands::Blob(hash_args) => {
             check_repo_initialized()?;
-            obj_database::get_data(&hash_args.file)?;
+            obj_database::get_data(&hash_args.key)?;
             // obj_database::create_tree()?;
         }
     }

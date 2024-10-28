@@ -3,6 +3,9 @@ use std::fs::File;
 use std::fs::{self};
 use std::io::{self, Read};
 use std::path::PathBuf;
+use crate::compression::compress_data;
+use std::fs::OpenOptions;
+use std::io::Write;
 // use zstd::stream::{encode_all as zstd_compress, decode_all as zstd_decompress};
 
 pub fn open_file(file_path: &PathBuf) -> io::Result<Vec<u8>> {
@@ -58,27 +61,27 @@ pub fn repo_remove(path: &str) -> io::Result<()> {
 
 //creates a file
 // pass in "None" to data when not writing to file
-// pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> io::Result<()> {
-//     let full_path = format!("{}/{}", file_path, filename);
+pub fn create_file(file_path: &str, filename: &str, data: Option<&Vec<u8>>) -> io::Result<()> {
+    let full_path = format!("{}/{}", file_path, filename);
 
-//     // Create the file (this will create an empty file)
-//     fs::File::create(&full_path)?;
+    // Create the file (this will create an empty file)
+    fs::File::create(&full_path)?;
 
-//     if let Some(data) = data {
-//         // Open the file for writing
-//         let mut file = OpenOptions::new()
-//             .write(true)
-//             .open(&full_path)?;
+    if let Some(data) = data {
+        // Open the file for writing
+        let mut file = OpenOptions::new()
+            .write(true)
+            .open(&full_path)?;
 
-//         // Write the data to the file
-//         // let compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
-//         let compressed_data = compress_data(data)?;
-//         file.write_all(&compressed_data)?;
-//         //println!("Data written to {}", full_path);
-//     }
+        // Write the data to the file
+        // let compressed_data = zstd_compress(Cursor::new(data), 3).expect("Failed to compress with zstd");
+        let compressed_data = compress_data(data)?;
+        file.write(&compressed_data)?;
+        //println!("Data written to {}", full_path);
+    }
 
-//     Ok(())
-// }
+    Ok(())
+}
 
 
 //create a directory
