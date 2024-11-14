@@ -19,11 +19,17 @@ pub enum Commands {
     /// Store the file in the object database and return the key
     HashObject(HashObjectCommand),
 
+    /// Read the file from the object database
+    CatFile(CatFileCommand),
+
+    /// Get the file from the object database
     Blob(BlobCommand),
 
+    /// Add the file to the staging area
     Add(AddCommand),
 
-    LsTree(HashObjectCommand)
+    /// List the contents of a tree object
+    LsTree(LsTreeCommand)
 }
 
 #[derive(Debug, Args)]
@@ -33,8 +39,14 @@ pub struct HashObjectCommand {
 }
 
 #[derive(Debug, Args)]
+pub struct CatFileCommand {
+    /// The key of the file
+    pub key: String
+}
+
+#[derive(Debug, Args)]
 pub struct BlobCommand {
-    /// The file to store
+    /// The key of the file
     pub key: String
 }
 
@@ -42,4 +54,10 @@ pub struct BlobCommand {
 pub struct AddCommand {
     /// The file to store
     pub file: String
+}
+
+#[derive(Debug, Args)]
+pub struct LsTreeCommand {
+    /// The key of the tree object
+    pub key: String
 }

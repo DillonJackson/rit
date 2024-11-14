@@ -6,13 +6,13 @@
 use crate::constants::{DIRECTORY_PATH, INDEX_FILE};
 use std::fs::{File};
 use std::io::{self, Read, Write, BufReader, BufWriter};
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndexEntry {
-    mode: u32,
-    blob_hash: String,
-    path: String
+    pub mode: u32,
+    pub blob_hash: String,
+    pub path: String
 }
 
 pub fn get_staged_files() -> io::Result<Vec<IndexEntry>> {
@@ -178,7 +178,6 @@ fn write_index_entry<W: Write>(writer: &mut W, entry: &IndexEntry) -> io::Result
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::Path;
     use std::io::Cursor;
 
     fn setup() {

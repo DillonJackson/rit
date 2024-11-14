@@ -1,6 +1,5 @@
 mod utility;
 mod database;
-mod obj_database;
 mod args;
 mod constants;
 mod index;
@@ -8,6 +7,8 @@ mod staging;
 mod repo;
 mod compression;
 mod hash;
+mod commit;
+mod tree;
 
 
 use repo::{rit_init, rit_remove, check_repo_initialized};
@@ -23,7 +24,8 @@ use std::io;
 // cargo run                     -- returns the help message   
 // cargo run init                -- runs the init command
 // cargo run remove              -- runs the repo remove command
-// cargo run hash-object         -- runs the repo remove command
+// cargo run hash-object         -- runs the remove command
+// cargo run add                 -- runs the repo add command
 
 fn main() -> io::Result<()> {
 
@@ -34,7 +36,6 @@ fn main() -> io::Result<()> {
     match args.command {
         Commands::Init => {
             rit_init()?;
-            obj_database::create_tree()?;
         },
         Commands::Remove => {
             check_repo_initialized()?;
@@ -45,6 +46,11 @@ fn main() -> io::Result<()> {
             let key = database::store_file(&hash_args.file)?;
             println!("{}", key);
         }
+        Commands::CatFile(cat_args) => {
+            check_repo_initialized()?;
+            let data = database::get_data(&cat_args.key)?;
+            println!("{}", String::from_utf8_lossy(&data));
+        },
         Commands::Blob(hash_args) => {
             check_repo_initialized()?;
             let data = database::get_data(&hash_args.key)?;
@@ -56,12 +62,17 @@ fn main() -> io::Result<()> {
         },
         Commands::LsTree(hash_args) => {
             check_repo_initialized()?;
-            let key = obj_database::get_tree(&hash_args.file)?;
-        },
-        Commands::Blob(hash_args) => {
-            check_repo_initialized()?;
-            obj_database::get_data(&hash_args.key)?;
-            // obj_database::create_tree()?;
+            let entries = tree::read_tree(&hash_args.key)?;
+            for entry in entries {
+                // Print each entry in the format: "<mode> <type> <hash>\t<name>"
+                println!(
+                    "{:06o} {}\t{}\t{}",
+                    entry.mode,
+                    entry.object_type,
+                    entry.hash,
+                    entry.name
+                );
+            }
         }
     }
 
