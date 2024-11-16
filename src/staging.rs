@@ -1,5 +1,7 @@
 use crate::index;
 use crate::database;
+use crate::commit;
+use crate::index::IndexEntry;
 use std::io::{Error, ErrorKind};
 
 
@@ -16,4 +18,8 @@ pub fn add_file_to_staging(file_path: &str) -> Result<(), Error> {
 
     // Add the file to the index
     index::add_to_index(file_path, &blob_hash)
+}
+
+pub fn get_staged_entries() -> std::io::Result<Vec<IndexEntry>> {
+    index::load_index()
 }

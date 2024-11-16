@@ -9,6 +9,7 @@ mod compression;
 mod hash;
 mod commit;
 mod tree;
+mod branches;
 
 
 use repo::{rit_init, rit_remove, check_repo_initialized};
@@ -73,6 +74,11 @@ fn main() -> io::Result<()> {
                     entry.name
                 );
             }
+        }
+        Commands::Commit(commit_args) => {
+            check_repo_initialized()?;
+            let commit_hash = commit::commit(&commit_args.message, &commit_args.committer)?;
+            println!("{}", commit_hash);
         }
     }
 

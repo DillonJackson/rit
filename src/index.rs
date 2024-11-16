@@ -15,11 +15,6 @@ pub struct IndexEntry {
     pub path: String
 }
 
-pub fn get_staged_files() -> io::Result<Vec<IndexEntry>> {
-    let entries = load_index()?;
-    Ok(entries)
-}
-
 pub fn get_index_path() -> PathBuf {
     Path::new(DIRECTORY_PATH).join(INDEX_FILE)
 }

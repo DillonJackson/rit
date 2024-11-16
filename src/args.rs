@@ -29,7 +29,10 @@ pub enum Commands {
     Add(AddCommand),
 
     /// List the contents of a tree object
-    LsTree(LsTreeCommand)
+    LsTree(LsTreeCommand),
+
+    /// Commit the changes in the staging area
+    Commit(CommitCommand)
 }
 
 #[derive(Debug, Args)]
@@ -60,4 +63,15 @@ pub struct AddCommand {
 pub struct LsTreeCommand {
     /// The key of the tree object
     pub key: String
+}
+
+#[derive(Debug, Args)]
+pub struct CommitCommand {
+    /// The commit message
+    #[clap(short, long, required = true)]
+    pub message: String,
+
+    /// The committer name
+    #[clap(short, long, required = true)]
+    pub committer: String
 }

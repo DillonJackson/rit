@@ -2,6 +2,7 @@ use crate::index;
 use crate::utility;
 use crate::constants::DIRECTORY_PATH;
 use crate::database;
+use crate::branches;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::fs;
@@ -37,6 +38,7 @@ pub fn rit_init() -> Result<()> {
     // utility::init_file_structure()?;
     database::create_object_database()?;
     index::create_index()?;
+    branches::init_branches()?;
 
     println!("Repository initialized at {}.", DIRECTORY_PATH);
     Ok(())
