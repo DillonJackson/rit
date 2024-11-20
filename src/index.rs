@@ -4,6 +4,7 @@
 
 
 use crate::constants::{DIRECTORY_PATH, INDEX_FILE};
+use std::collections::HashMap;
 use std::fs::{File};
 use std::io::{self, Read, Write, BufReader, BufWriter};
 use std::path::{Path, PathBuf};
@@ -30,24 +31,62 @@ pub fn create_index() -> io::Result<()> {
 
 // This function will add the file to the index file.
 pub fn add_to_index(file_path: &str, blob_hash: &str) -> io::Result<()> {
-    let mut entries = load_index()?;
+    let index = load_index()?;
 
-    // Check if the file is already in the index
-    if entries.iter().any(|entry| entry.path == file_path){
-        // Update the index entry
-        update_index(file_path, blob_hash)?;
-    } else {
-        // Add a new entry to the index
-        let entry = IndexEntry {
-            mode: 0o100644, // Normal file
+    let mut index_map: HashMap<String, IndexEntry> = index.into_iter()
+        .map(|entry| (entry.path.clone(), entry))
+        .collect();
+
+    let entry = index_map.entry(file_path.to_string()).or_insert(IndexEntry {
+        mode: 0o100644,
+        blob_hash: blob_hash.to_string(),
+        path: file_path.to_string(),
+    });
+    entry.blob_hash = blob_hash.to_string();
+
+    let index: Vec<IndexEntry> = index_map.into_values().collect();
+    save_index(&index)?;
+
+    Ok(())
+    // // Check if the file is already in the index
+    // if entries.iter().any(|entry| entry.path == file_path){
+    //     // Update the index entry
+    //     update_index(file_path, blob_hash)?;
+    // } else {
+    //     // Add a new entry to the index
+    //     let entry = IndexEntry {
+    //         mode: 0o100644, // Normal file
+    //         blob_hash: blob_hash.to_string(),
+    //         path: file_path.to_string()
+    //     };
+    //     entries.push(entry);
+    //     save_index(&entries)?;
+    // }
+    // Ok(())
+}
+
+pub fn bulk_add_to_index(entries: &[(&str, &str)]) -> io::Result<()> {
+    let index = load_index()?;
+
+    let mut index_map: HashMap<String, IndexEntry> = index.into_iter()
+        .map(|entry| (entry.path.clone(), entry))
+        .collect();
+
+    for (file_path, blob_hash) in entries {
+        let entry = index_map.entry(file_path.to_string()).or_insert(IndexEntry {
+            mode: 0o100644,
             blob_hash: blob_hash.to_string(),
-            path: file_path.to_string()
-        };
-        entries.push(entry);
-        save_index(&entries)?;
+            path: file_path.to_string(),
+        });
+        entry.blob_hash = blob_hash.to_string();
     }
+
+    let index: Vec<IndexEntry> = index_map.into_values().collect();
+    save_index(&index)?;
+
     Ok(())
 }
+
 
 // This function will read the index file and return the entries.
 pub fn load_index() -> io::Result<Vec<IndexEntry>> {
