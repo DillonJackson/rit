@@ -111,7 +111,7 @@ pub fn commit(message: &str, commiter:&str) -> io::Result<String> {
     };
 
     // Create a new tree
-    let tree_hash = tree::create_tree(&entries, latest_tree_hash.as_deref())?;
+    let tree_hash = tree::create_tree(&entries)?;
 
     // Create the commit object and store it in the database
     let commit_hash = create_commit_object(&tree_hash, message, commiter, latest_tree_hash.as_deref())?;

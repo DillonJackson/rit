@@ -17,132 +17,90 @@ pub struct TreeEntry {
 }
 
 
-pub fn create_tree(index_entries: &[IndexEntry], base_tree_hash: Option<&str>) -> io::Result<String> {
-
-    // Convert index entries to a map for easier processing
-    let mut path_to_entry: HashMap<String, IndexEntry> = HashMap::new();
-    for entry in index_entries {
-        path_to_entry.insert(entry.path.clone(), entry.clone());
-    }
-
+pub fn create_tree(index_entries: &[IndexEntry]) -> io::Result<String> {
     // Start recursive processing from the root directory
     let root_path: PathBuf = PathBuf::new();
-    let tree_hash: String = recursive_tree(root_path, base_tree_hash, index_entries.to_vec())?;
+    let tree_hash: String = recursive_tree(&root_path, index_entries)?;
 
     Ok(tree_hash)
 }
 
 
 fn recursive_tree(
-    cur_dir: PathBuf,
-    cur_tree_hash: Option<&str>,
-    entries: Vec<IndexEntry>,
+    cur_dir: &PathBuf,
+    entries: &[IndexEntry]
 ) -> io::Result<String> {
-    let mut tree_entries = BTreeMap::new();
+    let mut tree_entries: HashMap<String, TreeEntry> = HashMap::new();
+    let mut sub_tree_entries: HashMap<String, Vec<IndexEntry>> = HashMap::new();
 
-    // Get entries for the current directory
-    let mut cur_dir_blobs = Vec::new();
-    let mut cur_dir_subdirs = HashMap::new();
+    // Filter entries that belong to the current directory
+    for entry in entries {
+        let entry_path = Path::new(&entry.path);
+        let relative_path = entry_path.strip_prefix(&cur_dir).unwrap();
 
-    for entry in entries.iter() {
-        let path = Path::new(&entry.path);
-        if let Ok(relative_path) = path.strip_prefix(&cur_dir) {
-            let mut components = relative_path.components();
-            if let Some(comp) = components.next() {
-                if components.clone().count() == 0 {
-                    // This is a blob in the current directory
-                    cur_dir_blobs.push(entry.clone());
-                } else {
-                    // This is part of a subdirectory
-                    let dir_name = comp.as_os_str().to_str().unwrap().to_string();
-                    cur_dir_subdirs
-                        .entry(dir_name)
-                        .or_insert_with(Vec::new)
-                        .push(entry.clone());
-                }
+        let mut components = relative_path.components();
+
+        if let Some(first_component) = components.next() {
+            let name = first_component.as_os_str().to_str().unwrap().to_string();
+
+            if components.next().is_none() {
+                // Direct child of the current directory
+                tree_entries.insert(
+                    name.clone(),
+                    TreeEntry {
+                        mode: entry.mode,
+                        object_type: "blob".to_string(),
+                        hash: entry.blob_hash.clone(),
+                        name,
+                    },
+                );
+            } else {
+                // Entry belongs to a subdirectory
+                sub_tree_entries
+                    .entry(name.clone())
+                    .or_insert_with(Vec::new)
+                    .push(entry.clone());
             }
         }
     }
 
-    let existing_entries = if let Some(hash) = cur_tree_hash {
-        read_tree(hash)?
-    } else {
-        Vec::new()
-    };
-
-    // Include existing blob entries if they're unchanged
-    for existing_entry in &existing_entries {
-        if existing_entry.object_type == "blob"
-            && !cur_dir_blobs.iter().any(|e| {
-                let e_last_component = Path::new(&e.path).components().last().unwrap();
-                let existing_last_component = Path::new(&existing_entry.name).components().last().unwrap();
-                e_last_component == existing_last_component
-            })
-        {
-            tree_entries.insert(
-                existing_entry.name.clone(),
-                existing_entry.clone(),
-            );
-        }
-    }
-
-    // Add or update blob entries in the current directory
-    for blob in cur_dir_blobs {
-        let name = Path::new(&blob.path)
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+    // Process subdirectories recursively
+    for (sub_dir_name, sub_entries) in sub_tree_entries {
+        let sub_dir_path = cur_dir.join(&sub_dir_name);
+        let sub_tree_hash = recursive_tree(&sub_dir_path, &sub_entries)?;
         tree_entries.insert(
-            name.clone(),
+            sub_dir_name.clone(),
             TreeEntry {
-                mode: blob.mode,
-                object_type: "blob".to_string(),
-                hash: blob.blob_hash,
-                name,
-            },
-        );
-    }
-
-    // Recursively handle subdirectories
-    for (subdir_name, subdir_entries) in cur_dir_subdirs {
-        let subdir_path = cur_dir.join(&subdir_name);
-
-        // Find the existing hash for this subdirectory in the current tree (if it exists)
-        let subdir_hash = get_subtree_hash_from_base(&existing_entries, &subdir_name).ok();
-
-        // Recurse into the next directory
-        let subtree_hash = recursive_tree(subdir_path, subdir_hash.as_deref(), subdir_entries)?;
-
-        // Add the tree entry for this subdirectory
-        tree_entries.insert(
-            subdir_name.clone(),
-            TreeEntry {
-                mode: 0o040000, // Directory mode
+                mode: 0o040000, // Default mode for a tree
                 object_type: "tree".to_string(),
-                hash: subtree_hash,
-                name: subdir_name,
+                hash: sub_tree_hash,
+                name: sub_dir_name,
             },
         );
     }
 
-    // Serialize and store the current directory's tree
-    let serialized_data = serialize_tree_entries(&tree_entries.values().cloned().collect::<Vec<_>>())?;
-    let tree_hash = database::store_data(&serialized_data)?;
+    // Sort 
+    let mut entries = tree_entries.values().cloned().collect::<Vec<TreeEntry>>();
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    
+    // Serialize the tree entries
+    let serialized_tree = serialize_tree_entries(&entries)?;
+    
+    // Store the tree in the database and return its hash
+    let hash = database::store_data(&serialized_tree)?;
 
-    Ok(tree_hash)
+    Ok(hash)
 }
 
-fn get_subtree_hash_from_base(base_entries: &Vec<TreeEntry>, sub_name: &str) -> io::Result<String> {
-    // Find the subtree entry with the matching name and return its hash
-    if let Some(entry) = base_entries.iter().find(|e| e.name == sub_name && e.object_type == "tree") {
-        Ok(entry.hash.clone())
-    } else {
-        Err(io::Error::new(io::ErrorKind::NotFound, "Subtree not found"))
-    }
-}
+pub fn read_tree(tree_hash: &str) -> io::Result<Vec<TreeEntry>> {
+    // Get the data for the tree object
+    let data = database::get_data(tree_hash)?;
 
+    // Deserialize the tree entries
+    let entries = deserialize_tree_entries(&data)?;
+
+    Ok(entries)
+}
 
 fn serialize_tree_entries(entries: &[TreeEntry]) -> io::Result<Vec<u8>> {
     let mut data = Vec::new();
@@ -163,15 +121,6 @@ fn serialize_tree_entries(entries: &[TreeEntry]) -> io::Result<Vec<u8>> {
     Ok(data)
 }
 
-pub fn read_tree(tree_hash: &str) -> io::Result<Vec<TreeEntry>> {
-    // Get the data for the tree object
-    let data = database::get_data(tree_hash)?;
-
-    // Deserialize the tree entries
-    let entries = deserialize_tree_entries(&data)?;
-
-    Ok(entries)
-}
 
 fn deserialize_tree_entries(data: &[u8]) -> io::Result<Vec<TreeEntry>> {
     let mut entries: Vec<TreeEntry> = Vec::new();
@@ -257,26 +206,35 @@ mod tests {
     #[test]
     fn test_write_and_read_tree() -> io::Result<()> {
         // Prepare mock index entries
+        let file1_hash = database::store_data(b"content of file1.txt")?;
+        let file2_hash = database::store_data(b"content of file2.txt")?;
+        let file3_hash = database::store_data(b"content of file3.txt")?;
+
+        let file1_up_hash = database::store_data(b"updated content of file1.txt")?;
+        let file2_up_hash = database::store_data(b"updated content of file2.txt")?;
+        let file4_hash = database::store_data(b"content of file4.txt")?;
+        let file5_hash = database::store_data(b"content of file5.txt")?;
+
         let index_entries = vec![
             IndexEntry {
                 mode: 0o100644,
-                blob_hash: database::store_data(b"content of file1.txt")?,
+                blob_hash: file1_hash.clone(),
                 path: "file1.txt".to_string(),
             },
             IndexEntry {
                 mode: 0o100644,
-                blob_hash: database::store_data(b"content of file2.txt")?,
+                blob_hash: file2_hash.clone(),
                 path: "dir/file2.txt".to_string(),
             },
             IndexEntry {
                 mode: 0o100644,
-                blob_hash: database::store_data(b"content of file3.txt")?,
+                blob_hash: file3_hash.clone(),
                 path: "dir/subdir/file3.txt".to_string(),
             },
         ];
 
         // Write the tree
-        let tree_hash = create_tree(&index_entries, None)?;
+        let tree_hash = create_tree(&index_entries)?;
             print!("{:?}", tree_hash);
         // Read the tree
         let root_entries = read_tree(&tree_hash)?;
@@ -284,39 +242,42 @@ mod tests {
         // Check root entries
         assert_eq!(root_entries.len(), 2);
 
-        let mut expected_root_entries = vec![
+        let expected_root_entries = vec![
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "".to_string(), // We'll fill this in
+                hash: "321f43c94af8f5e541657d5340cbc3142b7bfefd47e3e3cdaafecea6043a1c77".to_string(), // We'll fill this in
                 name: "dir".to_string(),
             },
             TreeEntry {
                 mode: 0o100644,
                 object_type: "blob".to_string(),
-                hash: index_entries[0].blob_hash.clone(),
+                hash: file1_hash.clone(),
                 name: "file1.txt".to_string(),
             },
         ];
 
-        // Get the hash of the 'dir' tree
-        let dir_tree_hash = &root_entries.iter().find(|e| e.name == "dir").unwrap().hash;
-            print!("dir_tree_hash: {:?}", dir_tree_hash);
-        expected_root_entries[0].hash = dir_tree_hash.clone();
+        // check if the tree objects is the same
+        let tree_entry = expected_root_entries.iter().find(|e| e.name == "dir").unwrap();
+        let tree_entry2 = root_entries.iter().find(|e| e.name == "dir").unwrap();
+        assert_eq!(tree_entry, tree_entry2);
 
-        assert_eq!(root_entries, expected_root_entries);
-
+        // check if the blob objects is the same
+        let blob_entry = expected_root_entries.iter().find(|e| e.name == "file1.txt").unwrap();
+        let blob_entry2 = root_entries.iter().find(|e| e.name == "file1.txt").unwrap();
+        assert_eq!(blob_entry, blob_entry2);
+        
         // Read the 'dir' tree
-        let dir_entries = read_tree(dir_tree_hash)?;
+        let dir_entries = read_tree(&tree_entry2.hash)?;
 
         // Check 'dir' entries
         assert_eq!(dir_entries.len(), 2);
 
-        let mut expected_dir_entries = vec![
+        let expected_dir_entries = vec![
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "".to_string(), // We'll fill this in
+                hash: "b75adf893db42ced40c1682041cf0125303e2587c5e57e86c54eb4e61d037589".to_string(), // We'll fill this in
                 name: "subdir".to_string(),
             },
             TreeEntry {
@@ -326,11 +287,6 @@ mod tests {
                 name: "file2.txt".to_string(),
             },
         ];
-
-        // Get the hash of the 'subdir' tree
-        let subdir_tree_hash = &dir_entries.iter().find(|e| e.name == "subdir").unwrap().hash;
-
-        expected_dir_entries[0].hash = subdir_tree_hash.clone();
 
         // check if the tree objects is the same
         let tree_entry = expected_dir_entries.iter().find(|e| e.name == "subdir").unwrap();
@@ -343,7 +299,7 @@ mod tests {
         assert_eq!(blob_entry, blob_entry2);
 
         // Read the 'subdir' tree
-        let subdir_entries = read_tree(subdir_tree_hash)?;
+        let subdir_entries = read_tree(&tree_entry2.hash)?;
 
         // Check 'subdir' entries
         assert_eq!(subdir_entries.len(), 1);
@@ -352,7 +308,7 @@ mod tests {
             TreeEntry {
                 mode: 0o100644,
                 object_type: "blob".to_string(),
-                hash: index_entries[2].blob_hash.clone(),
+                hash: file3_hash.clone(),
                 name: "file3.txt".to_string(),
             },
         ];
@@ -363,29 +319,34 @@ mod tests {
         let updated_index_entries = vec![
             IndexEntry {
                 mode: 0o100644,
-                blob_hash: database::store_data(b"updated content of file1.txt")?,
+                blob_hash: file1_up_hash.clone(),
                 path: "file1.txt".to_string(),
             },
             IndexEntry {
                 mode: 0o100644,
-                blob_hash: database::store_data(b"updated content of file2.txt")?,
+                blob_hash: file2_up_hash.clone(),
                 path: "dir/file2.txt".to_string(),
             },
             // Leave file3.txt unchanged so we can reuse the hash
             IndexEntry {
                 mode: 0o100644,
-                blob_hash: database::store_data(b"content of file4.txt")?,
+                blob_hash: file3_hash.clone(),
+                path: "dir/subdir/file3.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 0o100644,
+                blob_hash: file4_hash.clone(),
                 path: "dir/file4.txt".to_string(),
             },
             IndexEntry {
                 mode: 0o100644,
-                blob_hash: database::store_data(b"content of file5.txt")?,
+                blob_hash: file5_hash.clone(),
                 path: "dir2/subdir2/file5.txt".to_string(),
             },
         ];
 
         // Write the updated tree
-        let updated_tree_hash = create_tree(&updated_index_entries, Some(&tree_hash))?;
+        let updated_tree_hash = create_tree(&updated_index_entries)?;
         println!("Updated tree hash: {:?}", updated_tree_hash);
 
         // Read the updated tree
@@ -394,75 +355,87 @@ mod tests {
         // Check updated root entries
         assert_eq!(updated_root_entries.len(), 3);
 
-        let mut expected_updated_root_entries = vec![
+        let expected_updated_root_entries = vec![
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "".to_string(), // We'll fill this in
+                hash: "18eb7eb3a25c4458ac27ef59e2050146c1bbc4699b31eb9d841b885b0bc1ff3c".to_string(), // We'll fill this in
                 name: "dir".to_string(),
             },
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "".to_string(), // We'll fill this in
+                hash: "f6b18b0e2cb32b3076ac983839ea4a140c20f97f8196d983c8274ac3a6547317".to_string(), // We'll fill this in
                 name: "dir2".to_string(),
             },
             TreeEntry {
                 mode: 0o100644,
                 object_type: "blob".to_string(),
-                hash: updated_index_entries[0].blob_hash.clone(),
+                hash: file1_up_hash.clone(),
                 name: "file1.txt".to_string(),
             },
         ];
-
-        // Get the hash of the updated 'dir' tree
-        let updated_dir_tree_hash = &updated_root_entries.iter().find(|e| e.name == "dir").unwrap().hash;
-        println!("updated_dir_tree_hash: {:?}", updated_dir_tree_hash);
-        expected_updated_root_entries[0].hash = updated_dir_tree_hash.clone();
-
-        // Get the hash of the updated 'dir2' tree
-        let updated_dir2_tree_hash = &updated_root_entries.iter().find(|e| e.name == "dir2").unwrap().hash;
-        println!("updated_dir2_tree_hash: {:?}", updated_dir2_tree_hash);
-        expected_updated_root_entries[1].hash = updated_dir2_tree_hash.clone();
-
-        assert_eq!(updated_root_entries, expected_updated_root_entries);
+        
+        // check if the tree objects is the same
+        let tree_entry = updated_root_entries.iter().find(|e| e.name == "dir").unwrap();
+        let tree_entry2 = expected_updated_root_entries.iter().find(|e| e.name == "dir").unwrap();
+        assert_eq!(tree_entry, tree_entry2);
+        
+        // check if the tree objects is the same
+        let tree_entry_dir_2 = updated_root_entries.iter().find(|e| e.name == "dir2").unwrap();
+        let tree_entry2_dir_2 = expected_updated_root_entries.iter().find(|e| e.name == "dir2").unwrap();
+        assert_eq!(tree_entry_dir_2, tree_entry2_dir_2);
+        
+        // check if the blob objects is the same
+        let blob_entry = updated_root_entries.iter().find(|e| e.name == "file1.txt").unwrap();
+        let blob_entry2 = expected_updated_root_entries.iter().find(|e| e.name == "file1.txt").unwrap();
+        assert_eq!(blob_entry, blob_entry2);
+        
 
         // Read the updated 'dir' tree
-        let updated_dir_entries = read_tree(updated_dir_tree_hash)?;
+        let updated_dir_entries = read_tree(&tree_entry.hash)?;
 
         // Check updated 'dir' entries
         assert_eq!(updated_dir_entries.len(), 3);
 
-        let mut expected_updated_dir_entries = vec![
+        let expected_updated_dir_entries = vec![
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "".to_string(), // We'll fill this in
+                hash: "b75adf893db42ced40c1682041cf0125303e2587c5e57e86c54eb4e61d037589".to_string(), // We'll fill this in
                 name: "subdir".to_string(),
             },
             TreeEntry {
                 mode: 0o100644,
                 object_type: "blob".to_string(),
-                hash: updated_index_entries[1].blob_hash.clone(),
+                hash: file2_up_hash.clone(),
                 name: "file2.txt".to_string(),
             },
             TreeEntry {
                 mode: 0o100644,
                 object_type: "blob".to_string(),
-                hash: updated_index_entries[2].blob_hash.clone(),
+                hash: file4_hash.clone(),
                 name: "file4.txt".to_string(),
             },
         ];
 
-        // Get the hash of the updated 'subdir' tree
-        let updated_subdir_tree_hash = &updated_dir_entries.iter().find(|e| e.name == "subdir").unwrap().hash;
-
-        expected_updated_dir_entries[0].hash = updated_subdir_tree_hash.clone();
-
-        assert_eq!(updated_dir_entries, expected_updated_dir_entries);
-
+        // check if the tree objects is the same
+        let tree_entry = updated_dir_entries.iter().find(|e| e.name == "subdir").unwrap();
+        let tree_entry2 = expected_updated_dir_entries.iter().find(|e| e.name == "subdir").unwrap();
+        assert_eq!(tree_entry, tree_entry2);
+        
+        // check if the blob objects is the same
+        let blob_entry = updated_dir_entries.iter().find(|e| e.name == "file2.txt").unwrap();
+        let blob_entry2 = expected_updated_dir_entries.iter().find(|e| e.name == "file2.txt").unwrap();
+        assert_eq!(blob_entry, blob_entry2);
+        
+        // check if the blob objects is the same
+        let blob_entry = updated_dir_entries.iter().find(|e| e.name == "file4.txt").unwrap();
+        let blob_entry2 = expected_updated_dir_entries.iter().find(|e| e.name == "file4.txt").unwrap();
+        assert_eq!(blob_entry, blob_entry2);
+        
         // Read the updated 'subdir' tree
-        let updated_subdir_entries = read_tree(updated_subdir_tree_hash)?;
+        let updated_subdir_entries = read_tree(&tree_entry.hash)?;
 
         // Check updated 'subdir' entries
         assert_eq!(updated_subdir_entries.len(), 1);
@@ -479,28 +452,24 @@ mod tests {
         assert_eq!(updated_subdir_entries, expected_updated_subdir_entries);
 
         // Read the updated 'dir2' tree
-        let updated_dir2_entries = read_tree(updated_dir2_tree_hash)?;
+        let updated_dir2_entries = read_tree(&tree_entry_dir_2.hash)?;
 
         // Check updated 'dir2' entries
         assert_eq!(updated_dir2_entries.len(), 1);
 
-        let mut expected_updated_dir2_entries = vec![
+        let expected_updated_dir2_entries = vec![
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "".to_string(), // We'll fill this in
+                hash: "00409df7eae574b0574efcf0afdd743f5a660a5534f822127e70cb1c10c6e2cf".to_string(), // We'll fill this in
                 name: "subdir2".to_string(),
             },
         ];
 
-        // Get the hash of the updated 'subdir2' tree
-        let updated_subdir2_tree_hash = &updated_dir2_entries.iter().find(|e| e.name == "subdir2").unwrap().hash;
-
-        expected_updated_dir2_entries[0].hash = updated_subdir2_tree_hash.clone();
-
         assert_eq!(updated_dir2_entries, expected_updated_dir2_entries);
-
+        
         // Read the updated 'subdir2' tree
+        let updated_subdir2_tree_hash = &updated_dir2_entries.iter().find(|e| e.name == "subdir2").unwrap().hash;
         let updated_subdir2_entries = read_tree(updated_subdir2_tree_hash)?;
 
         // Check updated 'subdir2' entries
@@ -510,7 +479,7 @@ mod tests {
             TreeEntry {
                 mode: 0o100644,
                 object_type: "blob".to_string(),
-                hash: updated_index_entries[4].blob_hash.clone(),
+                hash: file5_hash.clone(),
                 name: "file5.txt".to_string(),
             },
         ];
