@@ -31,6 +31,7 @@ pub fn create_index() -> io::Result<()> {
 
 // This function will add the file to the index file.
 pub fn add_to_index(file_path: &str, blob_hash: &str) -> io::Result<()> {
+    // TODO trim off the ./ and validate the file path to ensure is in your repo
     let index = load_index()?;
 
     let mut index_map: HashMap<String, IndexEntry> = index.into_iter()
@@ -48,24 +49,10 @@ pub fn add_to_index(file_path: &str, blob_hash: &str) -> io::Result<()> {
     save_index(&index)?;
 
     Ok(())
-    // // Check if the file is already in the index
-    // if entries.iter().any(|entry| entry.path == file_path){
-    //     // Update the index entry
-    //     update_index(file_path, blob_hash)?;
-    // } else {
-    //     // Add a new entry to the index
-    //     let entry = IndexEntry {
-    //         mode: 0o100644, // Normal file
-    //         blob_hash: blob_hash.to_string(),
-    //         path: file_path.to_string()
-    //     };
-    //     entries.push(entry);
-    //     save_index(&entries)?;
-    // }
-    // Ok(())
 }
 
 pub fn bulk_add_to_index(entries: &[(&str, &str)]) -> io::Result<()> {
+    // TODO trim off the ./ and validate the file path to ensure is in your repo
     let index = load_index()?;
 
     let mut index_map: HashMap<String, IndexEntry> = index.into_iter()

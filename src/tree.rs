@@ -121,7 +121,6 @@ fn serialize_tree_entries(entries: &[TreeEntry]) -> io::Result<Vec<u8>> {
     Ok(data)
 }
 
-
 fn deserialize_tree_entries(data: &[u8]) -> io::Result<Vec<TreeEntry>> {
     let mut entries: Vec<TreeEntry> = Vec::new();
     let mut i: usize = 0;

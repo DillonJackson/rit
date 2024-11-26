@@ -104,6 +104,8 @@ pub fn commit(message: &str, commiter:&str) -> io::Result<String> {
     // Get the latest commit hash if there is one
     let latest_commit_hash: Option<String> = branches::get_current_branch_commit_hash()?;
 
+    // Detect if there are no changes to commit, return a message
+
     // Create a new tree
     let tree_hash = tree::create_tree(&entries)?;
 
