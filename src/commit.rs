@@ -74,8 +74,14 @@ impl Commit {
                 "tree" => tree = value.to_string(),
                 "parent" => parent = Some(value.to_string()),
                 "committer" => {
-                    committer = value.to_string();
-                    timestamp = committer.split_whitespace().last().unwrap().parse().unwrap();
+                    let parts: Vec<&str> = value.split_whitespace().collect();
+                    if parts.len() > 2 {
+                        committer = parts[..parts.len() - 1].join(" ");
+                        timestamp = parts[parts.len() - 1].parse().unwrap_or_default();
+                    } else {
+                        committer = value.to_string(); // Fallback to the raw value
+                        timestamp = 0; // Default timestamp
+                    }
                 },
                 _ => {}
             }
@@ -96,25 +102,13 @@ pub fn commit(message: &str, commiter:&str) -> io::Result<String> {
     let entries = staging::get_staged_entries()?;
     
     // Get the latest commit hash if there is one
-    let latest_tree_hash: Option<String> = match branches::get_current_branch_commit_hash() {
-        Ok(result) => {
-            match result {
-                Some(hash) => {
-                    let commit_data = database::get_data(&hash)?;
-                    let commit = Commit::deserialize(&commit_data)?;
-                    Some(commit.tree)
-                },
-                None => None,
-            }
-        },
-        Err(e) => return Err(e),
-    };
+    let latest_commit_hash: Option<String> = branches::get_current_branch_commit_hash()?;
 
     // Create a new tree
     let tree_hash = tree::create_tree(&entries)?;
 
     // Create the commit object and store it in the database
-    let commit_hash = create_commit_object(&tree_hash, message, commiter, latest_tree_hash.as_deref())?;
+    let commit_hash = create_commit_object(&tree_hash, message, commiter, latest_commit_hash)?;
 
     // Update the branch to point to the new commit
     branches::update_current_branch(&commit_hash)?;
@@ -122,7 +116,7 @@ pub fn commit(message: &str, commiter:&str) -> io::Result<String> {
     Ok(commit_hash)
 }
 
-fn create_commit_object(tree_hash: &str, message: &str, commiter: &str, parent_commit_hash: Option<&str>) -> io::Result<String> {
+fn create_commit_object(tree_hash: &str, message: &str, commiter: &str, parent_commit_hash: Option<String>) -> io::Result<String> {
     let commit = Commit::new(
         tree_hash.to_string(),
         parent_commit_hash.map(|s| s.to_string()),
@@ -209,8 +203,8 @@ mod tests {
 
         assert_eq!(deserialized.tree, tree);
         assert_eq!(deserialized.parent, parent);
+        assert_eq!(deserialized.timestamp, commit.timestamp);
         assert_eq!(deserialized.committer, committer);
         assert_eq!(deserialized.message, message);
-        assert_eq!(deserialized.timestamp, commit.timestamp);
     }
 }

@@ -15,8 +15,16 @@ pub fn rit_remove() -> Result<()> {
     println!("Are you sure you want to remove the repository? (yes/no): ");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input)?;
-    if input.trim() != "yes" {
-        utility::repo_remove(DIRECTORY_PATH)?;
+    if input.trim() == "yes" {
+        match fs::remove_dir_all(DIRECTORY_PATH){
+            Ok(_) => {
+                return Ok(())
+            }
+            Err(e) => {
+                eprintln!("Error removing repo: {}", e);
+                return Err(e);
+            }
+        }
     }
     Ok(())
 }
