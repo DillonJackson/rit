@@ -7,6 +7,7 @@ use hex;
 use json::iterators::Entries;
 use std::io;
 use std::path::{Path, PathBuf};
+use crate::constants::{BLOB, TREE};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TreeEntry {
@@ -87,14 +88,14 @@ fn recursive_tree(
     let serialized_tree = serialize_tree_entries(&entries)?;
     
     // Store the tree in the database and return its hash
-    let hash = database::store_data(&serialized_tree)?;
+    let hash = database::store_data(&serialized_tree, TREE)?;
 
     Ok(hash)
 }
 
 pub fn read_tree(tree_hash: &str) -> io::Result<Vec<TreeEntry>> {
     // Get the data for the tree object
-    let data = database::get_data(tree_hash)?;
+    let (_, _, data) = database::get_data(tree_hash)?;
 
     // Deserialize the tree entries
     let entries = deserialize_tree_entries(&data)?;
@@ -205,14 +206,14 @@ mod tests {
     #[test]
     fn test_write_and_read_tree() -> io::Result<()> {
         // Prepare mock index entries
-        let file1_hash = database::store_data(b"content of file1.txt")?;
-        let file2_hash = database::store_data(b"content of file2.txt")?;
-        let file3_hash = database::store_data(b"content of file3.txt")?;
+        let file1_hash = database::store_data(b"content of file1.txt", BLOB)?;
+        let file2_hash = database::store_data(b"content of file2.txt", BLOB)?;
+        let file3_hash = database::store_data(b"content of file3.txt", BLOB)?;
 
-        let file1_up_hash = database::store_data(b"updated content of file1.txt")?;
-        let file2_up_hash = database::store_data(b"updated content of file2.txt")?;
-        let file4_hash = database::store_data(b"content of file4.txt")?;
-        let file5_hash = database::store_data(b"content of file5.txt")?;
+        let file1_up_hash = database::store_data(b"updated content of file1.txt", BLOB)?;
+        let file2_up_hash = database::store_data(b"updated content of file2.txt", BLOB)?;
+        let file4_hash = database::store_data(b"content of file4.txt", BLOB)?;
+        let file5_hash = database::store_data(b"content of file5.txt", BLOB)?;
 
         let index_entries = vec![
             IndexEntry {
@@ -245,7 +246,7 @@ mod tests {
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "321f43c94af8f5e541657d5340cbc3142b7bfefd47e3e3cdaafecea6043a1c77".to_string(), // We'll fill this in
+                hash: "70db42a48939d1d7ccbe5181c368841fae023a08857f48cadf62b1322b8643ee".to_string(), // We'll fill this in
                 name: "dir".to_string(),
             },
             TreeEntry {
@@ -276,7 +277,7 @@ mod tests {
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "b75adf893db42ced40c1682041cf0125303e2587c5e57e86c54eb4e61d037589".to_string(), // We'll fill this in
+                hash: "f84b4f567ada0bd4c4c70b36389b9114b0b630f845bbc789235a012f64955c7b".to_string(), // We'll fill this in
                 name: "subdir".to_string(),
             },
             TreeEntry {
@@ -358,13 +359,13 @@ mod tests {
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "18eb7eb3a25c4458ac27ef59e2050146c1bbc4699b31eb9d841b885b0bc1ff3c".to_string(), // We'll fill this in
+                hash: "3dd70afdee4ffc1dc741c162effe3eb142e8b0eb68e1f6dee0759bf8679381e3".to_string(), // We'll fill this in
                 name: "dir".to_string(),
             },
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "f6b18b0e2cb32b3076ac983839ea4a140c20f97f8196d983c8274ac3a6547317".to_string(), // We'll fill this in
+                hash: "b9f70f7df0d2064e9e860e74323dedc1a6ef3c800270f5492a7a2d8383c627f4".to_string(), // We'll fill this in
                 name: "dir2".to_string(),
             },
             TreeEntry {
@@ -401,7 +402,7 @@ mod tests {
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "b75adf893db42ced40c1682041cf0125303e2587c5e57e86c54eb4e61d037589".to_string(), // We'll fill this in
+                hash: "f84b4f567ada0bd4c4c70b36389b9114b0b630f845bbc789235a012f64955c7b".to_string(), // We'll fill this in
                 name: "subdir".to_string(),
             },
             TreeEntry {
@@ -460,7 +461,7 @@ mod tests {
             TreeEntry {
                 mode: 0o040000,
                 object_type: "tree".to_string(),
-                hash: "00409df7eae574b0574efcf0afdd743f5a660a5534f822127e70cb1c10c6e2cf".to_string(), // We'll fill this in
+                hash: "f974aef11d8693240620875b111bc7294abbb9ef42dfecd7a065c7997f616150".to_string(), // We'll fill this in
                 name: "subdir2".to_string(),
             },
         ];

@@ -33,3 +33,9 @@ pub fn refs_dir_path() -> PathBuf {
 pub fn heads_dir_path() -> PathBuf {
     refs_dir_path().join(HEADS_DIR)
 }
+
+
+// Object database types
+pub const BLOB: &str = "blob";
+pub const TREE: &str = "tree";
+pub const COMMIT: &str = "commit";

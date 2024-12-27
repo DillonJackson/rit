@@ -49,12 +49,15 @@ fn main() -> io::Result<()> {
         }
         Commands::CatFile(cat_args) => {
             check_repo_initialized()?;
-            let data = database::get_data(&cat_args.key)?;
+            let (_, _, data) = database::get_data(&cat_args.key)?;
             println!("{}", String::from_utf8_lossy(&data));
         },
         Commands::Blob(hash_args) => {
             check_repo_initialized()?;
-            let data = database::get_data(&hash_args.key)?;
+            let (object_type, _, data) = database::get_data(&hash_args.key)?;
+            if (object_type != constants::BLOB) {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "Object is not a blob"));
+            }
             println!("{}", String::from_utf8_lossy(&data));
         }
         Commands::Add(add_args) => {

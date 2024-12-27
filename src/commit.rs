@@ -6,6 +6,7 @@ use crate::staging;
 use crate::branches;
 use crate::tree;
 use crate::database;
+use crate::constants::COMMIT;
 
 #[derive(Debug)]
 struct Commit {
@@ -128,7 +129,7 @@ fn create_commit_object(tree_hash: &str, message: &str, commiter: &str, parent_c
 
     let commit_data = commit.serialize();
 
-    let commit_hash = database::store_data(&commit_data)?;
+    let commit_hash = database::store_data(&commit_data, COMMIT)?;
     Ok(commit_hash)
 }
 

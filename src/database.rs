@@ -1,4 +1,6 @@
-use crate::constants::{DIRECTORY_PATH, OBJECTS_DIR};
+use json::object;
+
+use crate::constants::{DIRECTORY_PATH, OBJECTS_DIR, BLOB};
 // use crate::utility::{create_directory, open_file};
 use crate::compression::{compress_data, uncompress_data};
 use crate::hash::{hash_data};
@@ -10,9 +12,16 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 
-pub fn store_data(data: &[u8]) -> io::Result<String> {
+pub fn store_data(data: &[u8], object_type: &str) -> io::Result<String> {
+    // Create metadata for the object
+    let metadata = format!("{} {}\0", object_type, data.len());
+
+    // Concatenate the metadata and data
+    let mut object = metadata.into_bytes();
+    object.extend_from_slice(data);
+
     //hash the data to obtain the key
-    let key = hash_data(&data)?;
+    let key = hash_data(&object)?;
 
     // Get the path to the object file
     let object_path = get_object_path(&key);
@@ -28,11 +37,11 @@ pub fn store_data(data: &[u8]) -> io::Result<String> {
     }
 
     // Compress the data before writing it to the file
-    let data = compress_data(data)?;
+    let object = compress_data(&object)?;
 
     // Write the data to the file in the object database
     let mut file = File::create(object_path)?; // Create the file
-    file.write_all(&data)?; // Write the data to the file
+    file.write_all(&object)?; // Write the data to the file
     file.flush()?; // Ensure all data is written to disk
 
     // Return the key
@@ -46,20 +55,52 @@ pub fn store_file(file_path: &str) -> io::Result<String> {
     file.read_to_end(&mut buffer)?;
 
     // Store the data in the object database
-    store_data(&buffer)
+    store_data(&buffer, BLOB)
 }
 
-pub fn get_data(key: &str) -> io::Result<Vec<u8>> {
+pub fn get_data(key: &str) -> io::Result<(String, usize, Vec<u8>)> {
     let file_path = get_object_path(key);
     if file_path.exists() {
         // Open the file and read its contents into a buffer
         let mut buffer = Vec::new();
         let mut file = File::open(file_path)?;
         file.read_to_end(&mut buffer)?;
-        uncompress_data(&buffer)
+        let data = uncompress_data(&buffer)?;
+        let (object_type, object_size, object_data) = parse_metadata_and_data(&data)?;
+        Ok((object_type.to_string(), object_size, object_data.to_vec()))
     } else {
         Err(io::Error::new(io::ErrorKind::NotFound, "Object not found"))
     }
+}
+
+fn parse_metadata_and_data(data: &[u8]) -> io::Result<(&str, usize, &[u8])> {
+    // Find the position of the first space character in the data
+    let first_space = data
+        .iter()
+        .position(|&x| x == b' ')
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid metadata: no space"))?;
+
+    // Find the position of the null character in the data
+    let null_char = data
+        .iter()
+        .position(|&x| x == b'\0')
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid metadata: no null terminator"))?;
+
+    // Extract the object type from the data
+    let object_type = std::str::from_utf8(&data[..first_space])
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid object type"))?;
+
+    // Extract the object size from the data
+    let object_size_str = std::str::from_utf8(&data[first_space + 1..null_char])
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid object size"))?;
+    let object_size: usize = object_size_str
+        .parse()
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Object size is not a valid number"))?;
+
+    // Extract the object data from the data
+    let object_data = &data[null_char + 1..];
+
+    Ok((object_type, object_size, object_data))
 }
 
 pub fn delete_data(key: &str) -> io::Result<()> {
@@ -121,11 +162,13 @@ mod tests {
 
         // Perform the test
         let data = b"example data";
-        let key = store_data(data).unwrap();
+        let key = store_data(data, BLOB).unwrap();
 
         // Check if the data was stored and can be retrieved correctly
-        let retrieved_data = get_data(&key).unwrap();
-        assert_eq!(retrieved_data, data);
+        let (object_type, object_size, object_data) = get_data(&key).unwrap();
+        assert_eq!(object_data, data);
+        assert_eq!(object_type, BLOB);
+        assert_eq!(object_size, data.len());
 
         // Restore the original directory
         env::set_current_dir(&original_dir).unwrap();
@@ -136,10 +179,15 @@ mod tests {
         let original_dir = setup_test_env();
 
         let data = b"example data";
-        let key = store_data(data).unwrap();
+        let key = store_data(data, BLOB).unwrap();
 
-        let retrieved_data = get_data(&key).unwrap();
-        assert_eq!(retrieved_data, data);
+        let (object_type, object_size, object_data) = get_data(&key).unwrap();
+        print!("{:?}", object_data);
+        assert_eq!(object_data, data);
+        print!("{:?}", object_type);
+        assert_eq!(object_type, BLOB);
+        print!("{:?}", object_size);
+        assert_eq!(object_size, data.len());
 
         delete_data(&key).unwrap();
         assert!(get_data(&key).is_err());
@@ -160,8 +208,10 @@ mod tests {
         let key = store_file(file_path.to_str().unwrap()).unwrap();
 
         // Retrieve and verify the stored content
-        let retrieved_data = get_data(&key).unwrap();
-        assert_eq!(retrieved_data, file_data);
+        let (object_type, object_size, object_data) = get_data(&key).unwrap();
+        assert_eq!(object_data, file_data);
+        assert_eq!(object_type, BLOB);
+        assert_eq!(object_size, file_data.len());
 
         env::set_current_dir(&original_dir).unwrap();
     }
