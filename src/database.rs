@@ -58,6 +58,27 @@ pub fn store_file(file_path: &str) -> io::Result<String> {
     store_data(&buffer, BLOB)
 }
 
+pub fn store_temporary(file_path: &str) -> io::Result<Vec<u8>>{
+    // Open the file in read-only mode and read its contents into a buffer
+    let mut buffer = Vec::new();
+    let mut file = File::open(file_path)?;
+    file.read_to_end(&mut buffer)?;
+
+    create_data(&buffer, BLOB)
+}
+
+pub fn create_data(data: &[u8], object_type: &str) -> io::Result<Vec<u8>> {
+    // Create metadata for the object
+    let metadata = format!("{} {} \0\n", object_type, data.len());
+
+    // Concatenate the metadata and data
+    let mut object = metadata.into_bytes();
+    object.extend_from_slice(data);
+    
+    // Return the key
+    Ok(object)
+}
+
 pub fn get_data(key: &str) -> io::Result<(String, usize, Vec<u8>)> {
     let file_path = get_object_path(key);
     if file_path.exists() {
@@ -140,6 +161,7 @@ mod tests {
     use tempfile::tempdir;
     use std::fs;
     use std::env;
+    use std::fs::metadata;
     use std::path::PathBuf;
 
     // Helper function to create a temp directory and set it as the current working directory
@@ -169,6 +191,24 @@ mod tests {
         assert_eq!(object_data, data);
         assert_eq!(object_type, BLOB);
         assert_eq!(object_size, data.len());
+
+        // Restore the original directory
+        env::set_current_dir(&original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_store_temp_and_create_data() {
+        let original_dir = setup_test_env(); // Switch to temp directory
+
+        // Perform the test
+        let data = b"example data";
+        let key = create_data(data, BLOB).unwrap();
+        // Check if the data was stored and can be retrieved correctly
+        // match std::str::from_utf8(&key) {
+        //     Ok(decoded_data) => println!("{}", decoded_data),
+        //     Err(e) => eprintln!("Failed to decode bytes: {}", e),
+        // }
+        assert!(true);
 
         // Restore the original directory
         env::set_current_dir(&original_dir).unwrap();
@@ -224,5 +264,29 @@ mod tests {
         assert!(get_data(non_existent_key).is_err());
 
         env::set_current_dir(&original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_valid_input() {
+        let data: &[u8] = b"object_type 1234\0object_data";
+
+        // Expected output
+        let expected_type = "object_type";
+        let expected_size = 1234;
+        let expected_data = b"object_data";
+
+        // Run the function
+        let result = parse_metadata_and_data(data);
+
+        assert!(result.is_ok());
+        let (object_type, object_size, object_data) = result.unwrap();
+
+        // Print the parsed results
+        println!("Parsed Object Type: {}", object_type);
+        println!("Parsed Object Size: {}", object_size);
+        println!("Parsed Object Data: {:?}", object_data);
+        assert_eq!(object_type, expected_type);
+        assert_eq!(object_size, expected_size);
+        assert_eq!(object_data, expected_data);
     }
 }

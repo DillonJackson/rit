@@ -6,12 +6,18 @@ pub const INDEX_FILE: &str = "index";
 
 pub const OBJECTS_DIR: &str = "objects";
 
+pub const SOURCE_PATH: &str = "src";
+
 pub const HEAD_FILE: &str = "HEAD";
 pub const REFS_DIR: &str = "refs";
 pub const HEADS_DIR: &str = "heads";
 
 pub fn directory_path() -> PathBuf {
     Path::new(DIRECTORY_PATH).to_path_buf()
+}
+
+pub fn source_path() -> PathBuf {
+    Path::new(SOURCE_PATH).to_path_buf()
 }
 
 pub fn index_file_path() -> PathBuf {

@@ -4,10 +4,14 @@
 
 
 use crate::constants::{DIRECTORY_PATH, INDEX_FILE};
+use crate::database::store_temporary;
 use std::collections::HashMap;
 use std::fs::{File};
 use std::io::{self, Read, Write, BufReader, BufWriter};
 use std::path::{Path, PathBuf};
+use crate::hash::{hash_data};
+use std::fs;
+use tempdir::TempDir;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndexEntry {
@@ -91,6 +95,7 @@ pub fn load_index() -> io::Result<Vec<IndexEntry>> {
         entries.push(entry);
     }
 
+    // println!("{:?}", entries);
     Ok(entries)
 }
 
@@ -194,9 +199,96 @@ fn write_index_entry<W: Write>(writer: &mut W, entry: &IndexEntry) -> io::Result
     Ok(())
 }
 
+fn create_index_from_path(directory: &Path) -> io::Result<Vec<IndexEntry>> {
+    let mut index = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(directory) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+
+            // If the path is a directory, recurse into it
+            if path.is_dir() {
+                let subdir_state = create_index_from_path(&path).unwrap();
+                index.extend(subdir_state);
+            } else {
+                // If it's a file, get its state
+                let mut object = store_temporary(&path.to_string_lossy().to_string()).unwrap();
+
+                let key = hash_data(&object)?;
+
+                let entry = IndexEntry {
+                    mode: 0o100644,
+                    blob_hash: key.to_string(),
+                    path: path.to_string_lossy().to_string(),
+                };
+
+                index.push(entry);    
+                }
+            }
+        }
+    Ok(index)
+}
+
+fn check_for_changes(previous_index_entry: &Vec<IndexEntry>, current_index_entry: &Vec<IndexEntry>) -> HashMap<String, String> {
+    let mut changes = HashMap::new();
+
+    // Create HashMap from path to blob_hash for quick lookup by borrowing values
+    let previous_files: HashMap<String, String> = previous_index_entry.iter()
+        .map(|entry| (entry.path.clone(), entry.blob_hash.clone()))
+        .collect();
+
+    let current_files: HashMap<String, String> = current_index_entry.iter()
+        .map(|entry| (entry.path.clone(), entry.blob_hash.clone()))
+        .collect();
+
+    // Check for changes in current files
+    for curr_index in current_index_entry.iter() {
+        let curr_path = &curr_index.path;
+        let curr_hash = &curr_index.blob_hash;
+
+        match previous_files.get(curr_path) {
+            Some(prev_hash) if prev_hash == curr_hash => {
+                // File has not changed (same blob_hash and path)
+                changes.insert(curr_path.clone(), "unmodified".to_string());
+            }
+            Some(_) => {
+                // File content has changed (hash is different)
+                changes.insert(curr_path.clone(), "modified".to_string());
+            }
+            None => {
+                // New file detected (not present in previous index)
+                changes.insert(curr_path.clone(), "new file".to_string());
+            }
+        }
+    }
+
+    // Check for removed files (present in previous index but not in current)
+    for prev_index in previous_index_entry.iter() {
+        let prev_path = &prev_index.path;
+        if !current_files.contains_key(prev_path) {
+            // File removed
+            changes.insert(prev_path.clone(), "deleted".to_string());
+        }
+    }
+
+    changes
+}
+
+pub fn file_changes(path: &Path) -> HashMap<String, String>{
+
+    let previous_index_entry: Vec<IndexEntry> = load_index().unwrap();
+    let current_index_entry = create_index_from_path(path).unwrap();
+
+    let changes = check_for_changes(&previous_index_entry, &current_index_entry);
+
+    changes
+}
+
 
 #[cfg(test)]
 mod tests {
+    use crate::constants::SOURCE_PATH;
+
     use super::*;
     use std::fs;
     use std::io::Cursor;
@@ -452,5 +544,308 @@ mod tests {
         fs::remove_file(index_path).unwrap();
 
         cleanup();
+    }
+
+    // Helper function to create a test file
+    fn create_test_file<P: AsRef<Path>>(path: P, content: &str) -> std::io::Result<()> {
+        let mut file = File::create(path)?;
+        file.write_all(content.as_bytes())?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_index_from_path() {
+        // Create a temporary directory to test in
+        let temp_dir = TempDir::new("test_dir").unwrap();
+        let temp_path = temp_dir.path();
+
+        // Create some test files in the temporary directory
+        let file1 = temp_path.join("file1.txt");
+        create_test_file(&file1, "Hello, World!").unwrap();
+
+        let file2 = temp_path.join("file2.txt");
+        create_test_file(&file2, "Rust is awesome!").unwrap();
+
+        // Create a subdirectory and add a file inside it
+        let subdir = temp_path.join("subdir");
+        fs::create_dir(&subdir).unwrap();
+        let file3 = subdir.join("file3.txt");
+        create_test_file(&file3, "Subdirectory file content").unwrap();
+
+        // Call create_index_from_path on the temporary directory
+        let index = create_index_from_path(temp_path).unwrap();
+
+        // Print out the index to see the results
+        println!("Index: {:#?}", index);
+
+        // Check that the index contains entries for the files
+        assert_eq!(index.len(), 3);  // We expect 3 files (file1.txt, file2.txt, file3.txt)
+
+        // Check if specific files exist in the index
+        assert!(index.iter().any(|entry| entry.path == file1.to_string_lossy()));
+        assert!(index.iter().any(|entry| entry.path == file2.to_string_lossy()));
+        assert!(index.iter().any(|entry| entry.path == file3.to_string_lossy()));
+    }
+
+
+    // Function to print out the directory structure
+    fn print_directory_structure<P: AsRef<Path>>(path: P, indent: usize) -> std::io::Result<()> {
+        let path = path.as_ref();
+        
+        // Print the current directory or file with proper indentation
+        println!("{:indent$}{}", "", path.display(), indent = indent);
+        
+        if path.is_dir() {
+            // If it's a directory, print its contents recursively
+            for entry in fs::read_dir(path)? {
+                let entry = entry?;
+                let entry_path = entry.path();
+                print_directory_structure(entry_path, indent + 4)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_index_from_path_multiple_subdirs() {
+        // Create a temporary directory to test in
+        let temp_dir = TempDir::new("test_dir").unwrap();
+        let temp_path = temp_dir.path();
+
+        // Create files in the root directory
+        let file1 = temp_path.join("file1.txt");
+        create_test_file(&file1, "Root file 1").unwrap();
+
+        let file2 = temp_path.join("file2.txt");
+        create_test_file(&file2, "Root file 2").unwrap();
+
+        // Create a subdirectory and add files inside it
+        let subdir1 = temp_path.join("subdir1");
+        fs::create_dir(&subdir1).unwrap();
+        let file3 = subdir1.join("file3.txt");
+        create_test_file(&file3, "Subdir 1 file").unwrap();
+
+        let subdir2 = temp_path.join("subdir2");
+        fs::create_dir(&subdir2).unwrap();
+        let file4 = subdir2.join("file4.txt");
+        create_test_file(&file4, "Subdir 2 file").unwrap();
+
+        // Create another level of subdirectories and files
+        let subsubdir1 = subdir1.join("subsubdir1");
+        fs::create_dir(&subsubdir1).unwrap();
+        let file5 = subsubdir1.join("file5.txt");
+        create_test_file(&file5, "Subsubdir 1 file").unwrap();
+
+        let subsubdir2 = subdir2.join("subsubdir2");
+        fs::create_dir(&subsubdir2).unwrap();
+        let file6 = subsubdir2.join("file6.txt");
+        create_test_file(&file6, "Subsubdir 2 file").unwrap();
+
+        // Print the directory structure
+        println!("\nDirectory Structure:");
+        print_directory_structure(temp_path, 0).unwrap();
+
+        // Call create_index_from_path on the temporary directory
+        let index = create_index_from_path(temp_path).unwrap();
+
+        // Print out the index to see the results
+        println!("Index: {:#?}", index);
+
+        // Check the expected number of entries (6 files in total)
+        assert_eq!(index.len(), 6);
+
+        // Check if specific files exist in the index
+        assert!(index.iter().any(|entry| entry.path == file1.to_string_lossy()));
+        assert!(index.iter().any(|entry| entry.path == file2.to_string_lossy()));
+        assert!(index.iter().any(|entry| entry.path == file3.to_string_lossy()));
+        assert!(index.iter().any(|entry| entry.path == file4.to_string_lossy()));
+        assert!(index.iter().any(|entry| entry.path == file5.to_string_lossy()));
+        assert!(index.iter().any(|entry| entry.path == file6.to_string_lossy()));
+    }
+
+    #[test]
+    fn test_check_for_changes_no_file_changes() {
+        // Define some sample index entries
+        let previous_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "7ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(),
+            },
+        ];
+
+        let current_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "7ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(),
+            },
+        ];
+        
+        let changes = check_for_changes(&previous_index_entry, &current_index_entry);
+
+        let expected_changes = vec![
+            ("/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(), "unmodified".to_string()),
+            ("/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(), "unmodified".to_string()),
+        ];
+
+        // Assert that the changes match the expected values
+        for (path, expected_change) in expected_changes {
+            assert_eq!(changes.get(&path), Some(&expected_change));
+        } 
+    }
+
+    #[test]
+    fn test_check_for_changes_one_file_change() {
+        // Define some sample index entries
+        let previous_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "1ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(),
+            },
+        ];
+
+        let current_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "7ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(),
+            },
+        ];
+
+        let changes = check_for_changes(&previous_index_entry, &current_index_entry);
+
+        let expected_changes = vec![
+            ("/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(), "modified".to_string()),
+            ("/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(), "unmodified".to_string()),
+        ];
+
+        // Assert that the changes match the expected values
+        for (path, expected_change) in expected_changes {
+            assert_eq!(changes.get(&path), Some(&expected_change));
+        }    
+    }
+
+    #[test]
+    fn test_check_for_changes_one_filename_change() {
+        // Define some sample index entries
+        let previous_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "1ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(),
+            },
+        ];
+
+        let current_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "7ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file3.txt".to_string(),
+            },
+        ];
+
+        let changes = check_for_changes(&previous_index_entry, &current_index_entry);
+        
+        // for (path, change) in &changes {
+        //     println!("Path: {}, Change: {}", path, change);
+        // }
+
+        let expected_changes = vec![
+            ("/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(), "modified".to_string()),
+            ("/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(), "deleted".to_string()),
+            ("/tmp/test_dir.z2hWBWkSguqs/file3.txt".to_string(), "new file".to_string()),
+        ];
+
+        // Assert that the changes match the expected values
+        for (path, expected_change) in expected_changes {
+            assert_eq!(changes.get(&path), Some(&expected_change));
+        }    
+    }
+
+    #[test]
+    fn test_check_for_changes_one_filename_change_v2() {
+        // Define some sample index entries
+        let previous_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "1ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file3.txt".to_string(),
+            },
+        ];
+
+        let current_index_entry = vec![
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "7ac90a45302da0bd11bdb6d9ea02c4f9df215c5eec7c3a590436e850e9017fb".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(),
+            },
+            IndexEntry {
+                mode: 33188,
+                blob_hash: "b5278c6a1461eff7b70a2bb360e95f020e1303905dc26aa8d44b557a8ced1d12".to_string(),
+                path: "/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(),
+            },
+        ];
+
+        let changes = check_for_changes(&previous_index_entry, &current_index_entry);
+        
+        // for (path, change) in &changes {
+        //     println!("Path: {}, Change: {}", path, change);
+        // }
+
+        let expected_changes = vec![
+            ("/tmp/test_dir.z2hWBWkSguqs/file2.txt".to_string(), "new file".to_string()),
+            ("/tmp/test_dir.z2hWBWkSguqs/file1.txt".to_string(), "modified".to_string()),
+            ("/tmp/test_dir.z2hWBWkSguqs/file3.txt".to_string(), "deleted".to_string()),
+        ];
+
+        // Assert that the changes match the expected values
+        for (path, expected_change) in expected_changes {
+            assert_eq!(changes.get(&path), Some(&expected_change));
+        } 
+            
+    }
+
+    #[test]
+    fn test_file_changes() {
+        let path = PathBuf::from(SOURCE_PATH);
+        let result = file_changes(&path);
+        assert!(!result.is_empty());  
     }
 }
