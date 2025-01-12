@@ -133,6 +133,16 @@ fn create_commit_object(tree_hash: &str, message: &str, commiter: &str, parent_c
     Ok(commit_hash)
 }
 
+pub fn data_to_commit(data: Vec<u8>) -> Commit{
+    let commit = Commit::deserialize(&data).unwrap();
+    commit
+}
+
+pub fn commit_tree_hash_from_data(data: Vec<u8>) -> String{
+    let commit = Commit::deserialize(&data).unwrap();
+    commit.tree
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

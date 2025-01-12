@@ -3,15 +3,21 @@
 // The index file stores the file name, the hash value of the file, and the file path.
 
 
-use crate::constants::{DIRECTORY_PATH, INDEX_FILE};
+use crate::constants::{DIRECTORY_PATH, INDEX_FILE,SOURCE_PATH};
 use crate::database::store_temporary;
+use crate::tree::{self, convert_tree_entry_to_hashmap};
 use std::collections::HashMap;
 use std::fs::{File};
 use std::io::{self, Read, Write, BufReader, BufWriter};
+use std::ops::Index;
 use std::path::{Path, PathBuf};
 use crate::hash::{hash_data};
 use std::fs;
 use tempdir::TempDir;
+use crate::branches::{self, get_current_branch_commit_hash, get_current_tree_from_commit_hash};
+use crate::staging;
+use colored::Colorize;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndexEntry {
@@ -283,6 +289,86 @@ pub fn file_changes(path: &Path) -> HashMap<String, String>{
 
     changes
 }
+
+pub fn get_status(){
+    let path = PathBuf::from(SOURCE_PATH);
+    let result = file_changes(&path);
+
+    let branch_name = branches::get_current_branch_name().unwrap();
+    print!("On branch {}\n\n", branch_name);
+
+    // Compares the tree with Index files 
+    let tree_hash = get_current_tree_from_commit_hash();
+    let tree_hashmap = convert_tree_entry_to_hashmap(tree_hash);
+    let tree_index_entry = create_entry_from_hashmap(tree_hashmap);
+    let current_index_entry = load_index().unwrap();
+    let staged_changes = check_for_changes(&tree_index_entry, &current_index_entry);
+
+    println!("Changes to be committed:\n    (use \"git reset HEAD <file>...\" to unstage)");
+    for (path, change) in &staged_changes {
+        println!("{}", format!("{}:   {}", change, path).green());
+    }
+
+    println!("\n\n");
+    // compares the index files to current directory 
+    println!("Changes not staged for commit:\n  (use \"rit add <file>... to update what will be committed)");
+    for (path, change) in &result {
+        if change == "modified" || change == "deleted" {
+            println!("{}", format!("{}:   {}", change, path).red());
+        }
+    }
+
+
+    println!("\n\n");
+    // compares the index files to current directory 
+    println!("Untracked files:\n    (use \"rit add <file>... to include in what will be committed)");
+    for (path, change) in &result {
+        if change == "new file"{
+            println!("{}", format!("{}:   {}", change, path).red());
+        }
+    }
+
+
+}
+
+pub fn create_entry_from_hashmap(tree: HashMap<String, String>) -> Vec<IndexEntry>{
+    tree.into_iter()
+    .map(|(path, blob_hash)| IndexEntry {
+        mode: 0o100644, 
+        blob_hash,
+        path,
+    })
+    .collect()
+}
+
+pub fn get_status_test(result: HashMap<String, String>,  staged_changes: HashMap<String, String>){
+
+    println!("Changes to be committed:\n    (use \"git reset HEAD <file>...\" to unstage)");
+    for (path, change) in &staged_changes {
+        println!("{}", format!("{}:   {}", change, path).green());
+    }
+
+    println!("\n\n");
+    // compares the index files to current directory 
+    println!("Changes not staged for commit:\n  (use \"rit add <file>... to update what will be committed)");
+    for (path, change) in &result {
+        if change == "modified" || change == "deleted" {
+            println!("{}", format!("{}:   {}", change, path).red());
+        }
+    }
+
+    println!("\n\n");
+    // compares the index files to current directory 
+    println!("Untracked files:\n    (use \"rit add <file>... to include in what will be committed)");
+    for (path, change) in &result {
+        if change == "new file"{
+            println!("{}", format!("{}:   {}", change, path).red());
+        }
+    }
+
+
+}
+
 
 
 #[cfg(test)]
@@ -838,7 +924,7 @@ mod tests {
         // Assert that the changes match the expected values
         for (path, expected_change) in expected_changes {
             assert_eq!(changes.get(&path), Some(&expected_change));
-        } 
+        }
             
     }
 
@@ -846,6 +932,48 @@ mod tests {
     fn test_file_changes() {
         let path = PathBuf::from(SOURCE_PATH);
         let result = file_changes(&path);
+        // for (path, change) in &result {
+        //     println!("Path: {}, Change: {}", path, change);
+        // }
         assert!(!result.is_empty());  
+    }
+
+    #[test]
+    fn test_get_status() {
+        get_status();
+    }
+
+    #[test]
+    fn test_get_status_test() {
+        // result are from the current directory and the index entries
+        let mut result = HashMap::new();
+        result.insert("file1.rs".to_string(), "modified".to_string());
+        result.insert("file2.rs".to_string(), "new file".to_string());
+        result.insert("file3.rs".to_string(), "deleted".to_string());
+    
+        //staged entries are from the tree and index entries
+        let mut staged_changes = HashMap::new();
+        staged_changes.insert("file4.rs".to_string(), "modified".to_string());
+        staged_changes.insert("file5.rs".to_string(), "added".to_string());
+    
+        // Call the function with the example data
+        get_status_test(result, staged_changes);
+    
+    }
+
+    #[test]
+    fn test_get_status_two_staged_change() {
+        // result are from the current directory and the index entries
+        let mut result = HashMap::new();
+        result.insert("file2.rs".to_string(), "new file".to_string());
+    
+        //staged entries are from the tree and index entries
+        let mut staged_changes = HashMap::new();
+        staged_changes.insert("file4.rs".to_string(), "modified".to_string());
+        staged_changes.insert("file5.rs".to_string(), "added".to_string());
+    
+        // Call the function with the example data
+        get_status_test(result, staged_changes);
+    
     }
 }

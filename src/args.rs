@@ -32,7 +32,10 @@ pub enum Commands {
     LsTree(LsTreeCommand),
 
     /// Commit the changes in the staging area
-    Commit(CommitCommand)
+    Commit(CommitCommand),
+
+    /// Show changes in directory
+    Status
 }
 
 #[derive(Debug, Args)]

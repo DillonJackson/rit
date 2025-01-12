@@ -170,6 +170,18 @@ fn deserialize_tree_entries(data: &[u8]) -> io::Result<Vec<TreeEntry>> {
     Ok(entries)
 }
 
+pub fn convert_tree_entry_to_hashmap(entries: Vec<TreeEntry>) -> HashMap<String, String> {
+    let mut result = HashMap::new();
+
+    for entry in entries {
+        if entry.object_type == "blob" {
+            result.insert(entry.name, entry.hash);
+        }
+    }
+
+    result
+}
+
 
 #[cfg(test)]
 mod tests {

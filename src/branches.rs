@@ -1,5 +1,7 @@
 use std::{fs, io::{self, ErrorKind, Write}};
+use crate::{database::get_data, tree::{read_tree, TreeEntry}};
 use crate::constants::{head_file_path, refs_dir_path, heads_dir_path};
+use crate::commit::commit_tree_hash_from_data;
 
 pub fn init_branches() -> io::Result<()> {
     // Make HEAD file
@@ -51,6 +53,15 @@ pub fn get_current_branch_commit_hash() -> io::Result<Option<String>> {
     } else {
         Ok(None)
     }
+}
+
+pub fn get_current_tree_from_commit_hash()-> Vec<TreeEntry>{
+    let commit_hash = get_current_branch_commit_hash().unwrap().unwrap();
+    let commit_hash_str: &str = &commit_hash;
+    let (_,_,data) = get_data(commit_hash_str).unwrap();
+    let tree = commit_tree_hash_from_data(data);
+    let tree_entry = read_tree(&tree).unwrap();
+    tree_entry
 }
 
 pub fn get_commit_hash(branch_name: &str) -> io::Result<Option<String>> {

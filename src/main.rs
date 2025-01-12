@@ -16,6 +16,7 @@ use repo::{rit_init, rit_remove, check_repo_initialized};
 use args::{RitArgs, Commands};
 use clap::Parser;
 use std::io;
+use crate::index::get_status;
 
 // 100644 for normal files.
 // 100755 for executable files.
@@ -59,7 +60,7 @@ fn main() -> io::Result<()> {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, "Object is not a blob"));
             }
             println!("{}", String::from_utf8_lossy(&data));
-        }
+        },
         Commands::Add(add_args) => {
             check_repo_initialized()?;
             staging::add_file_to_staging(&add_args.file)?;
@@ -77,11 +78,15 @@ fn main() -> io::Result<()> {
                     entry.name
                 );
             }
-        }
+        },
         Commands::Commit(commit_args) => {
             check_repo_initialized()?;
             let commit_hash = commit::commit(&commit_args.message, &commit_args.committer)?;
             println!("{}", commit_hash);
+        },
+        Commands::Status => {
+            check_repo_initialized()?;
+            get_status();
         }
     }
 
