@@ -1,4 +1,4 @@
-![R](sci-fi rusted letter R.png)
+![R](/R.png)
 # Rit 
 Rit is a streamlined implementation of Git, developed in Rust. It serves as an ideal tool for those looking to manage project source code locally, explore Git functionalities, or gain hands-on experience with Rust development. Whether you are seeking to learn Rust, contribute to an open-source project, or evaluate a new Git alternative, Rit offers a practical starting point.
 
