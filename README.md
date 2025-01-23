@@ -6,7 +6,7 @@ At present, Rit supports a selection of Git commands. However, not all command o
 
 ## Working commands
 - `rit init` - Initialize a new git repository
-- `rit remove` - Removed the repository
+- `rit remove` - Removes the repository
 - `rit help` - Show the help message
 - `rit hash-object` - Store the object in the object database and return the hash
 - `rit cat-file` - Print the contents of the object
