@@ -8,10 +8,13 @@ At present, Rit supports a selection of Git commands. However, not all command o
 - `rit init` - Initialize a new git repository
 - `rit remove` - Removed the repository
 - `rit help` - Show the help message
+- `rit hash-object` - Store the object in the object database and return the hash
+- `rit cat-file` - Print the contents of the object
+- `rit blob` - Print the contents of the blob object
 - `rit add <file>` - Add a file to the staging area
-- `rit status` - Show the status of the repository
+- `rit ls-tree` - List the contents of a tree object
 - `rit commit` - Commit the staged files
-- `rit log` - Show the commit history
+- `rit status` - Show the status of the repository
 
 ## How to run
 ```shell
